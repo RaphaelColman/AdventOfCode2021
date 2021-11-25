@@ -2,10 +2,12 @@
 
 module Web.AoCUtils
   ( getPuzzleInput
-  , getPuzzleInputE
+  , getTestPuzzleInput
+  , ConfigError
   ) where
 
 import           Advent
+import           Common.FileUtils           (getTestInputFile)
 import           Configuration.Dotenv       (defaultConfig, loadFile)
 import           Control.Monad.Trans.Class  (MonadTrans (lift))
 import           Control.Monad.Trans.Except (Except, ExceptT (ExceptT), except,
@@ -21,40 +23,35 @@ data ConfigError
   | MkGenericConfigError String
   deriving (Show)
 
-getPuzzleInput :: Integer -> IO (Either ConfigError String)
+getPuzzleInput :: Integer -> ExceptT ConfigError IO String
 getPuzzleInput day = do
-  loadFile defaultConfig
   sessionKey <- readEnv "SESSION_KEY"
   year <- readEnv "AOC_YEAR"
-  let mOpts = liftA2 mkOpts sessionKey year
-  case mOpts of
-    Left error -> pure $ Left error
-    Right opts -> (fmap . fmap) T.unpack (getPuzzleInput' day opts)
+  let mOpts = mkOpts sessionKey year
+  input <- getPuzzleInput' day mOpts
+  pure $ T.unpack input
 
-getPuzzleInputE :: Integer -> ExceptT ConfigError IO String
-getPuzzleInputE x = ExceptT $ getPuzzleInput 1
+getTestPuzzleInput :: Integer -> ExceptT ConfigError IO String
+getTestPuzzleInput day = do
+  year <- readEnv "AOC_YEAR"
+  ExceptT $ do
+    input <- getTestInputFile year (fromInteger day)
+    pure $ Right input
 
 mkOpts :: String -> String -> AoCOpts
 mkOpts sessionKey year =
   AoCOpts sessionKey (read year :: Integer) (Just "res") False 3000000
 
-getPuzzleInput' :: Integer -> AoCOpts -> IO (Either ConfigError T.Text)
+getPuzzleInput' :: Integer -> AoCOpts -> ExceptT ConfigError IO T.Text
 getPuzzleInput' day opts = do
-  result <- runAoC opts $ AoCInput $ mkDay_ day
-  pure $
-    case result of
-      Left error -> Left $ MkAoCError error
-      Right str  -> Right str
-
-getPuzzleInput'' :: Integer -> AoCOpts -> ExceptT ConfigError IO T.Text
-getPuzzleInput'' day opts = do
   withExceptT MkAoCError $ ExceptT $ runAoC opts $ AoCInput $ mkDay_ day
 
-readEnv :: String -> IO (Either ConfigError String)
-readEnv envVar = do
-  loadFile defaultConfig
-  env <- getEnv envVar
-  pure $
-    case env of
-      Nothing  -> Left $ MkGenericConfigError $ "Failed to get " ++ envVar
-      Just str -> Right str
+readEnv :: String -> ExceptT ConfigError IO String
+readEnv envVar =
+  ExceptT $ do
+    loadFile defaultConfig
+    env <- getEnv envVar
+    pure $
+      case env of
+        Nothing  -> Left $ MkGenericConfigError $ "Failed to get " ++ envVar
+        Just str -> Right str

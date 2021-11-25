@@ -26,6 +26,9 @@ dependencies:
 - dotenv
 - transformers
 - trifecta
+- directory
+- text-format
+- containers
 
 library:
   source-dirs: src

@@ -25,8 +25,34 @@ source-repository head
 
 library
   exposed-modules:
-      AoC1.ReportRepair
+      Common.AoCSolutions
+      Common.FileUtils
       Lib
+      Solutions.Day1
+      Solutions.Day10
+      Solutions.Day11
+      Solutions.Day12
+      Solutions.Day13
+      Solutions.Day14
+      Solutions.Day15
+      Solutions.Day16
+      Solutions.Day17
+      Solutions.Day18
+      Solutions.Day19
+      Solutions.Day2
+      Solutions.Day20
+      Solutions.Day21
+      Solutions.Day22
+      Solutions.Day23
+      Solutions.Day24
+      Solutions.Day25
+      Solutions.Day3
+      Solutions.Day4
+      Solutions.Day5
+      Solutions.Day6
+      Solutions.Day7
+      Solutions.Day8
+      Solutions.Day9
       Web.AoCUtils
   other-modules:
       Paths_AdventOfCode2021
@@ -35,8 +61,11 @@ library
   build-depends:
       advent-of-code-api >=0.2.8
     , base >=4.7 && <5
+    , containers
+    , directory
     , dotenv
     , text
+    , text-format
     , transformers
     , trifecta
   default-language: Haskell2010
@@ -52,8 +81,11 @@ executable AdventOfCode2021-exe
       AdventOfCode2021
     , advent-of-code-api >=0.2.8
     , base >=4.7 && <5
+    , containers
+    , directory
     , dotenv
     , text
+    , text-format
     , transformers
     , trifecta
   default-language: Haskell2010
@@ -70,8 +102,11 @@ test-suite AdventOfCode2021-test
       AdventOfCode2021
     , advent-of-code-api >=0.2.8
     , base >=4.7 && <5
+    , containers
+    , directory
     , dotenv
     , text
+    , text-format
     , transformers
     , trifecta
   default-language: Haskell2010
