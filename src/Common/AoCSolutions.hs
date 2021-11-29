@@ -27,10 +27,11 @@ printSolutions' day puzzleInputFun (MkAoCSolution parser part1 part2) = do
     runExceptT $ do
       input <- puzzleInputFun day
       let parsed = parseString parser mempty input
-      lift $ putStrLn "Part 1:"
-      lift $ print $ part1 <$> parsed
-      lift $ putStrLn "Part 2:"
-      lift $ print $ part2 <$> parsed
+      lift $ do
+        putStrLn "Part 1:"
+        print $ part1 <$> parsed
+        putStrLn "Part 2:"
+        print $ part2 <$> parsed
   print result
 
 printSolutions :: (Show b, Show c) => Integer -> AoCSolution a b c -> IO ()
