@@ -1,13 +1,13 @@
 # Advent of Code 2021
 
 ### Overview
-This is inspired by mstksg's fantastic Haskell solutions found [here](URL "https://github.com/mstksg/advent-of-code-2020").
+This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
 
 This year I'll atempt to write my thoughts on each day's solution, and why this challenge is so much fun in Haskell. You can use this repo as a starter project for writing your own solutions in Haskell as it abstracts away the slightly tricky IO/reading puzzle input from file etc.
 
 ## Getting started
-See [here](URL "https://www.haskell.org/platform/") for how to install the Haskell platform.
-This repo is built using [stack](URL "https://docs.haskellstack.org/en/stable/README/") which you will also need to install. After that, run `stack build` to build the project.
+See [here](https://www.haskell.org/platform/) for how to install the Haskell platform.
+This repo is built using [stack](https://docs.haskellstack.org/en/stable/README/) which you will also need to install. After that, run `stack build` to build the project.
 
 This project uses a .env file for configuration. See `.env.example` to create your own. You can get your session key by logging into Advent of Code then inspecting your cookies. After that, the project will handle getting your puzzle input and caching it in the /res directory.
 
