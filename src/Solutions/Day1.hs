@@ -3,7 +3,7 @@ module Solutions.Day1
   ) where
 
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
-                                      printSolutions)
+                                      printSolutions, printTestSolutions)
 import           Data.Foldable       (find)
 import           Data.List           (tails)
 import           Text.Trifecta       (Parser, TokenParsing (token), integer,
@@ -13,24 +13,25 @@ aoc1 :: IO ()
 aoc1 = do
   printSolutions 1 $ MkAoCSolution parseInput part1 part2
 
-type Expenses = [Integer]
+type Depths = [Integer]
 
-parseInput :: Parser Expenses
+parseInput :: Parser Depths
 parseInput = do
   some $ token integer
 
-part1 :: Expenses -> Maybe Integer
-part1 expenses = do
-  (a, b) <- find (\(x, y) -> x + y == 2020) $ pairs expenses
-  pure (a * b)
+part1 :: Depths -> Int
+part1 = sonarSweep
 
-part2 :: Expenses -> Maybe Integer
-part2 expenses = do
-  (a, b, c) <- find (\(x, y, z) -> x + y + z == 2020) $ triplets expenses
-  pure (a * b * c)
+part2 :: Depths -> Int
+part2 = sonarSweep . map (\(x, y, z) -> x + y + z) . window3
 
-pairs :: [a] -> [(a, a)]
-pairs l = [(x, y) | (x:ys) <- tails l, y <- ys]
+sonarSweep :: Depths -> Int
+sonarSweep = length . filter (> 0) . map (\(x, y) -> y - x) . window2
 
-triplets :: [a] -> [(a, a, a)]
-triplets l = [(x, y, z) | (x:ys) <- tails l, (y:zs) <- tails ys, z <- zs]
+window2 :: [a] -> [(a, a)]
+window2 l@(x:xs) = zip l xs
+window2 _        = []
+
+window3 :: [a] -> [(a, a, a)]
+window3 l@(x:y:xs) = zip3 l (y : xs) xs
+window3 _          = []

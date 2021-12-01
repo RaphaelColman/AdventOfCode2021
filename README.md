@@ -20,7 +20,7 @@ data AoCSolution a b c =
     , _part2  :: a -> c
     }
 ```
-See Day1.hs for an example, which has been implemented for 2020 day 1.
+See Day1.hs for an example, which has been implemented for day 1.
 
 To run, you can use the GHCI repl. For example:
 ```
