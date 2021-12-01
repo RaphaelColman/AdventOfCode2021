@@ -4,8 +4,6 @@ module Solutions.Day1
 
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions, printTestSolutions)
-import           Data.Foldable       (find)
-import           Data.List           (tails)
 import           Text.Trifecta       (Parser, TokenParsing (token), integer,
                                       some)
 
