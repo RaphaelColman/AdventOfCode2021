@@ -1,11 +1,19 @@
 # Advent of Code 2021
 
+# Table of Contents
+- [Advent of Code 2021](#advent-of-code-2021)
+- [Table of Contents](#table-of-contents)
+    - [Overview](#overview)
+    - [Getting started](#getting-started)
+- [Write up](#write-up)
+    - [Day 1](#day-1)
+
 ### Overview
 This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
 
 This year I'll atempt to write my thoughts on each day's solution, and why this challenge is so much fun in Haskell. You can use this repo as a starter project for writing your own solutions in Haskell as it abstracts away the slightly tricky IO/reading puzzle input from file etc.
 
-## Getting started
+### Getting started
 See [here](https://www.haskell.org/platform/) for how to install the Haskell platform.
 This repo is built using [stack](https://docs.haskellstack.org/en/stable/README/) which you will also need to install. After that, run `stack build` to build the project.
 
@@ -54,3 +62,45 @@ Part 2:
 Success (Just 278783190)
 Right ()
 ```
+
+
+# Write up
+### Day 1
+Day 1 is always more of a warm-up puzzle. In this case, the 'puzzle bit' is figuring out how to convert a list like:
+`[1,2,3,4,5,6,7,8]` into `[(1,2),(2,3),(3,4),(4,5),(5,6),(6,7),(7,8)]`.
+Fortunately, the `zip` function comes to the rescue, which 'zips' through two lists at the same time and makes a tuple of the two values. So
+```
+zip [1,2,3] [4,5,6] --> [(1,4), (2,5), (3,6)]
+```
+
+With some smart pattern matching, we can zip a list with the same list minus the first element:
+```
+window2 :: [a] -> [(a, a)]
+window2 l@(_:xs) = zip l xs
+window2 _        = []
+```
+After that it's just a matter of filtering the tuples to leave only those where the second item is greater than the first:
+```
+sonarSweep :: [Int] -> Int
+sonarSweep = length . filter id . map (\(x, y) -> y > x) . window2
+```
+
+For part 2, we do almost exactly the same thing, except this time we use `zip3` which, as the name implies, will 'zip' through three lists
+```
+window3 :: [a] -> [(a, a, a)]
+window3 l@(_:y:xs) = zip3 l (y : xs) xs
+window3 _          = []
+```
+
+Adding the items in the tuple together is pretty easy:
+```
+part2 :: Depths -> Int
+part2 = sonarSweep . map (\(x, y, z) -> x + y + z) . window3
+```
+
+We can actually write a generic `windowN` function which creates windows of arbitrary length:
+```
+windowN :: Int -> [a] -> [[a]]
+windowN n xs = filter ((== n) . length) $ map (take n) $ tails xs
+```
+but personally, I think I prefer the window2/window3 version. Those ones make tuples rather than lists, which means you have compile-time guarantees about their length.
