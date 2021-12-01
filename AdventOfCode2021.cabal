@@ -61,6 +61,7 @@ library
   build-depends:
       advent-of-code-api >=0.2.8
     , base >=4.7 && <5
+    , combinatorial
     , containers
     , directory
     , dotenv
@@ -81,6 +82,7 @@ executable AdventOfCode2021-exe
       AdventOfCode2021
     , advent-of-code-api >=0.2.8
     , base >=4.7 && <5
+    , combinatorial
     , containers
     , directory
     , dotenv
@@ -102,6 +104,7 @@ test-suite AdventOfCode2021-test
       AdventOfCode2021
     , advent-of-code-api >=0.2.8
     , base >=4.7 && <5
+    , combinatorial
     , containers
     , directory
     , dotenv
