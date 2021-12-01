@@ -30,6 +30,9 @@ dependencies:
 - text-format
 - containers
 - combinatorial
+- linear
+- lens
+- split
 
 library:
   source-dirs: src
