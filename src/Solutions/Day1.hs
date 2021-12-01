@@ -24,7 +24,7 @@ part2 :: Depths -> Int
 part2 = sonarSweep . map (\(x, y, z) -> x + y + z) . window3
 
 sonarSweep :: Depths -> Int
-sonarSweep = length . filter (> 0) . map (\(x, y) -> y - x) . window2
+sonarSweep = length . filter id . map (\(x, y) -> y > x) . window2
 
 window2 :: [a] -> [(a, a)]
 window2 l@(x:xs) = zip l xs
