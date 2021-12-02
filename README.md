@@ -7,6 +7,7 @@
     - [Getting started](#getting-started)
 - [Write up](#write-up)
     - [Day 1](#day-1)
+    - [Day 2](#day-2)
 
 ### Overview
 This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
@@ -104,3 +105,59 @@ windowN :: Int -> [a] -> [[a]]
 windowN n xs = filter ((== n) . length) $ map (take n) $ tails xs
 ```
 but personally, I think I prefer the window2/window3 version. Those ones make tuples rather than lists, which means you have compile-time guarantees about their length.
+
+### Day 2
+I made the mistake of adding [this browser extension](https://chrome.google.com/webstore/detail/advent-of-code-charts/ipbomkmbokofodhhjpipflmdplipblbe) and looking at delta times. I guess I'm just quite slow!
+Also not such a challenging day today. I chose to use the excellent [Linear V2](https://hackage.haskell.org/package/linear-1.20.7/docs/Linear-V2.html) package to keep track of position. Probably overkill, as the reason you would use V2 is in order to add positions together like vectors, and I barely ended up doing that!
+```
+data Direction
+  = Forward
+  | Up
+  | Down
+  deriving (Show, Eq, Enum)
+
+data Instruction =
+  MkInstruction
+    { _direction :: Direction
+    , _amount    :: Integer
+    }
+  deriving (Show, Eq)
+
+type Position = V2 Integer
+```
+To implement, it's just folding over a list. You have to use `foldl` to ensure to fold from left to right. To fold, you need an aggregating function:
+```
+addInstruction :: Instruction -> Position -> Position
+addInstruction (MkInstruction direction amount) pos =
+  case direction of
+    Up      -> pos - V2 0 amount
+    Down    -> pos + V2 0 amount
+    Forward -> pos + V2 amount 0
+```
+And of course to supply it with a 'starting value' (in this case `V2 0 0`)
+So part 1 becomes:
+```
+part1 :: [Instruction] -> Integer
+part1 = (\(V2 x y) -> x * y) . foldl' (flip addInstruction) (V2 0 0)
+```
+the 'flip' is because `addInstruction` takes an `Instruction` first, then a `Position`, whereas foldl' needs it to be the other way around (ie a -> b -> a). Flip will just reverse the order of the two parameters.
+
+For part 2, we need more state than just position. Now it's position and aim:
+```
+data PositionWithAim =
+  MkPositionWithAim
+    { _position :: Position
+    , _aim      :: Integer
+    }
+  deriving (Show, Eq)
+```
+Which makes our aggregating function look like this:
+```
+addInstructionWithAim :: Instruction -> PositionWithAim -> PositionWithAim
+addInstructionWithAim (MkInstruction direction amount) (MkPositionWithAim position aim) =
+  case direction of
+    Up      -> MkPositionWithAim position $ aim - amount
+    Down    -> MkPositionWithAim position $ aim + amount
+    Forward -> MkPositionWithAim (position + V2 amount (aim * amount)) aim
+```
+Bring on day 3!
