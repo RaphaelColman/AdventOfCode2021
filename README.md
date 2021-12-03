@@ -186,18 +186,17 @@ part1 bd = gamma * epsilon
 ```
 `toDecimal` is just a function which zips through a `BinaryDigit` and multiplies it by the corresponding power of 2 (so we can geta decimal at the end)
 The `mostCommon` and `leastCommon` functions are just helpers for list which do what they say on the tin. Did you see how `BinaryDigit` derives `Ord`? That means
-Haskell will use the order you've declared the data constructures to implement the `Ord` typeclass. We get the added bonus that it will take `ONE` as the tie-breaker in `mostCommon` and `ZERO` as the tie-breaker in `leastCommon`. That's lucky, because it's required for the puzzle!
+Haskell will use the order you've declared the data constructors to implement the `Ord` typeclass. We get the added bonus that it will take `ONE` as the tie-breaker in `mostCommon` and `ZERO` as the tie-breaker in `leastCommon`. That's lucky, because it's required for the puzzle!
 ```haskell
 toDecimal :: [BinaryDigit] -> Integer
-toDecimal bd = sum $ zipWith (*) (reverse asIntList) [2 ^ n | n <- [0,1 ..]]
+toDecimal = sum . (zipWith (*) [2 ^ n | n <- [0,1 ..]]) . reverse . asIntList
   where
-    asIntList = map chToInt bd
-    chToInt ch =
-      case ch of
-        ZERO -> 0
-        ONE  -> 1
+    asIntList :: [BinaryDigit] -> [Integer]
+    asIntList = map (toInteger . fromEnum)
 
 ```
+`toDecimal` can use `fromEnum` to get the correct values for ZERO and ONE (ZERO is the first data constructor, so its enum value is 0 etc)
+
 Unfortunately, part 2 is significantly harder. Simply mapping through a transposed list won't work anymore because we're mutating the list as we go. I spent a while trying to figure out a clever way of doing this,
 then eventually I gave up and decided to just use recursion. Any time you want to do the same sort of thing as a while loop in Haskell, you can achieve it by defining some state for your loop first:
 ```haskell
@@ -231,14 +230,14 @@ So in this case, if `S.lookup` failed to find anything and returned a `Nothing`,
 
 Now we can get from one ReadState to another, we can use recursion to loop through until some condition is met (in this case, there is only one value in the list of values)
 ```haskell
-runReadState' :: ReadState -> Maybe [BinaryDigit]
-runReadState' rs@(MkReadState index values)
+runReadState :: ReadState -> Maybe [BinaryDigit]
+runReadState rs@(MkReadState index values)
   | length values == 1 =
     let value = head values
      in pure $ toList value
   | otherwise = stepReadState rs >>= runReadState
 ```
-This might look a little daunting, but it helps to read it line by line. It will first check the ReadState you've passed in. Specifically, it will check the length of the `values` field. If that values field is length 1, it will just return it. That's our "base case". In all other cases, it will step the ReadState once and then recurse. We've had to to use `>>=` because both `StepReadState` and `runReadState` return a `Maybe`, so we use monads to bind them together into one `Maybe`. We don't normally use `>>=` that much because we would use the `Do` notation to achieve the same thing instead.
+This might look a little daunting, but it helps to read it line by line. It will first check the ReadState you've passed in. Specifically, it will check the length of the `values` field. If that values field is length 1, it will just return it. That's our "base case". In all other cases, it will step the ReadState once and then recurse. We've had to use `>>=` because both `StepReadState` and `runReadState` return a `Maybe`, so we use monads to bind them together into one `Maybe`. We don't normally use `>>=` that much because we would use the `Do` notation to achieve the same thing instead.
 Of course, this had the `mostCommon` function hard-coded in. We can parameterise that as well:
 ```haskell
 runReadState ::
@@ -259,4 +258,4 @@ part2 bd = do
   pure $ oxyGen * co2Scrub
 ```
 
-This took me an absurd amount of time this morning, partly because I was desperate to finder a neater way of doing than explicit recursion. I also realised that my `AoCSolution` forces you to parse to the same structure for both part 1 and part 2 - almost always the case, but it was annoying today because I had parsed much more naively for part 1 (I just made a list of strings). I'll try and find some time today to separate those out so you can treat the two parts of the puzzle more independently.
+This took me an absurd amount of time this morning, partly because I was desperate to finder a neater way of doing it than explicit recursion. I also realised that my `AoCSolution` forces you to parse to the same structure for both part 1 and part 2 - almost always the case, but it was annoying today because I had parsed much more naively for part 1 (I just made a list of strings). I'll try and find some time today to separate those out so you can treat the two parts of the puzzle more independently.

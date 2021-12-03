@@ -31,10 +31,7 @@ parseInput :: Parser [[BinaryDigit]]
 parseInput = some $ token parseBinaryDigits
 
 parseBinaryDigits :: Parser [BinaryDigit]
-parseBinaryDigits =
-  some $ do
-    c <- digit
-    getBinary c
+parseBinaryDigits = some $ digit >>= getBinary
   where
     getBinary char =
       case char of
@@ -85,10 +82,7 @@ leastCommon :: Ord a => [a] -> a
 leastCommon = snd . minimum . map (\xs -> (length xs, head xs)) . group . sort
 
 toDecimal :: [BinaryDigit] -> Integer
-toDecimal bd = sum $ zipWith (*) (reverse asIntList) [2 ^ n | n <- [0,1 ..]]
+toDecimal = sum . (zipWith (*) [2 ^ n | n <- [0,1 ..]]) . reverse . asIntList
   where
-    asIntList = map chToInt bd
-    chToInt ch =
-      case ch of
-        ZERO -> 0
-        ONE  -> 1
+    asIntList :: [BinaryDigit] -> [Integer]
+    asIntList = map (toInteger . fromEnum)
