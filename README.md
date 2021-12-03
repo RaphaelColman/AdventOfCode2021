@@ -212,21 +212,16 @@ Then we can define a function to take a ReadState and 'progress' to the next ite
 ```haskell
 stepReadState :: ReadState -> Maybe ReadState
 stepReadState (MkReadState index values) = do
-  digits <- mapM (S.lookup index) values
-  let n = mostCommon digits
-  let newValues =
-        filter
-          (\x ->
-             let lookedUp = S.index x index
-              in n == lookedUp)
-          values
-  pure $ MkReadState (index + 1) newValues
+  foundDigit <- mapM (S.lookup index) values
+  filtered <- filterM (fmap (== foundDigit) . S.lookup index) values
+  pure $ MkReadState (index + 1) filtered
 ```
 What's this `mapM` thing? It's a convenience function around Monads. In this case, it will take a function which returns a `Maybe`, map it over a list of something, and instead of creating a list of Maybes, it will convert it to `Maybe List`. The actual type signature:
 ```haskell
 mapM :: (Traversable t, Monad m) => (a -> m b) -> t a -> m (t b)
 ```
 So in this case, if `S.lookup` failed to find anything and returned a `Nothing`, the entire list (`digits`) would be `Nothing`.
+It's the same concept for `filterM`. It's just like using `filter`, but I can use it with a function which returns a Monad (a Maybe in this case).
 
 Now we can get from one ReadState to another, we can use recursion to loop through until some condition is met (in this case, there is only one value in the list of values)
 ```haskell

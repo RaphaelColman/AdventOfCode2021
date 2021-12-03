@@ -4,11 +4,12 @@ module Solutions.Day3
 
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions, printTestSolutions)
+import           Common.ListUtils    (leastCommon, mostCommon)
+import           Control.Monad       (filterM)
 import           Data.Foldable       (Foldable (toList))
 import           Data.List           (group, sort, transpose)
 import           Data.Sequence       (Seq)
 import qualified Data.Sequence       as S
-import           GHC.Natural         (isValidNatural)
 import           Text.Trifecta       (Parser, TokenParsing (token), digit, some)
 
 aoc3 :: IO ()
@@ -57,15 +58,9 @@ initReadState input = MkReadState 0 $ map S.fromList input
 
 stepReadState :: ([BinaryDigit] -> BinaryDigit) -> ReadState -> Maybe ReadState
 stepReadState f (MkReadState index values) = do
-  digits <- mapM (S.lookup index) values
-  let n = f digits
-  let newValues =
-        filter
-          (\x ->
-             let lookedUp = S.index x index
-              in n == lookedUp)
-          values
-  pure $ MkReadState (index + 1) newValues
+  foundDigit <- f <$> mapM (S.lookup index) values
+  filtered <- filterM (fmap (== foundDigit) . S.lookup index) values
+  pure $ MkReadState (index + 1) filtered
 
 runReadState ::
      ([BinaryDigit] -> BinaryDigit) -> ReadState -> Maybe [BinaryDigit]
@@ -74,12 +69,6 @@ runReadState f rs@(MkReadState index values)
     let value = head values
      in pure $ toList value
   | otherwise = stepReadState f rs >>= runReadState f
-
-mostCommon :: Ord a => [a] -> a
-mostCommon = snd . maximum . map (\xs -> (length xs, head xs)) . group . sort
-
-leastCommon :: Ord a => [a] -> a
-leastCommon = snd . minimum . map (\xs -> (length xs, head xs)) . group . sort
 
 toDecimal :: [BinaryDigit] -> Integer
 toDecimal = sum . (zipWith (*) [2 ^ n | n <- [0,1 ..]]) . reverse . asIntList

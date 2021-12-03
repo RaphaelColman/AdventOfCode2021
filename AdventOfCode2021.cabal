@@ -26,8 +26,10 @@ source-repository head
 library
   exposed-modules:
       Common.AoCSolutions
+      Common.EnumUtils
       Common.FileUtils
       Common.Geometry
+      Common.ListUtils
       Lib
       Solutions.Day1
       Solutions.Day10

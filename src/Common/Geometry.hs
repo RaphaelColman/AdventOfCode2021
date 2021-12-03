@@ -1,5 +1,3 @@
-{-# LANGUAGE TupleSections #-}
-
 module Common.Geometry where
 
 import           Control.Lens    ((^.))
@@ -25,9 +23,6 @@ enumerateMultilineStringToVectorMap :: String -> M.Map (V2 Int) Char
 enumerateMultilineStringToVectorMap =
   M.fromList . map (\((x, y), c) -> (V2 x y, c)) . enumerateMultilineString
 
-freqs :: (Ord k, Num a) => [k] -> M.Map k a
-freqs xs = M.fromListWith (+) (map (, 1) xs)
-
 renderVectorMap :: M.Map (V2 Int) Char -> String
 renderVectorMap m =
   if null m
@@ -47,19 +42,3 @@ renderVectorMap m =
       ]
     panelRows = chunksOf xRange panelList
     rendered = unlines (replicate xRange '=' : panelRows)
-
-enumNext :: (Enum a, Eq a, Bounded a) => a -> a
-enumNext e
-  | e == maxBound = minBound
-  | otherwise = succ e
-
-enumPrev :: (Enum a, Eq a, Bounded a) => a -> a
-enumPrev e
-  | e == minBound = maxBound
-  | otherwise = pred e
-
-stepEnum :: (Enum a, Eq a, Bounded a) => a -> Int -> a
-stepEnum enum times = iterate enumNext enum !! times
-
-prevStepEnum :: (Enum a, Eq a, Bounded a) => a -> Int -> a
-prevStepEnum enum times = iterate enumPrev enum !! times
