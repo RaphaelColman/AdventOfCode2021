@@ -22,7 +22,7 @@ This repo is built using [stack](https://docs.haskellstack.org/en/stable/README/
 This project uses a .env file for configuration. See `.env.example` to create your own. You can get your session key by logging into Advent of Code then inspecting your cookies. After that, the project will handle getting your puzzle input and caching it in the /res directory.
 
 To solve a day, just open the corresponding DayX.hs file in the /solutions directory. Each solution must be of the form:
-```
+```haskell
 data AoCSolution a b c =
   MkAoCSolution
     { _parser :: Parser a
@@ -76,32 +76,32 @@ zip [1,2,3] [4,5,6] --> [(1,4), (2,5), (3,6)]
 ```
 
 With some smart pattern matching, we can zip a list with the same list minus the first element:
-```
+```haskell
 window2 :: [a] -> [(a, a)]
 window2 l@(_:xs) = zip l xs
 window2 _        = []
 ```
 After that it's just a matter of filtering the tuples to leave only those where the second item is greater than the first:
-```
+```haskell
 sonarSweep :: [Int] -> Int
 sonarSweep = length . filter id . map (\(x, y) -> y > x) . window2
 ```
 
 For part 2, we do almost exactly the same thing, except this time we use `zip3` which, as the name implies, will 'zip' through three lists
-```
+```haskell
 window3 :: [a] -> [(a, a, a)]
 window3 l@(_:y:xs) = zip3 l (y : xs) xs
 window3 _          = []
 ```
 
 Adding the items in the tuple together is pretty easy:
-```
+```haskell
 part2 :: Depths -> Int
 part2 = sonarSweep . map (\(x, y, z) -> x + y + z) . window3
 ```
 
 We can actually write a generic `windowN` function which creates windows of arbitrary length:
-```
+```haskell
 windowN :: Int -> [a] -> [[a]]
 windowN n xs = filter ((== n) . length) $ map (take n) $ tails xs
 ```
@@ -110,7 +110,7 @@ but personally, I think I prefer the window2/window3 version. Those ones make tu
 ### Day 2
 I made the mistake of adding [this browser extension](https://chrome.google.com/webstore/detail/advent-of-code-charts/ipbomkmbokofodhhjpipflmdplipblbe) and looking at delta times. I guess I'm just quite slow!
 Also not such a challenging day today. I chose to use the excellent [Linear V2](https://hackage.haskell.org/package/linear-1.20.7/docs/Linear-V2.html) package to keep track of position. Probably overkill, as the reason you would use V2 is in order to add positions together like vectors, and I barely ended up doing that!
-```
+```haskell
 data Direction
   = Forward
   | Up
@@ -127,7 +127,7 @@ data Instruction =
 type Position = V2 Integer
 ```
 To implement, it's just folding over a list. You have to use `foldl` to ensure to fold from left to right. To fold, you need an aggregating function:
-```
+```haskell
 addInstruction :: Instruction -> Position -> Position
 addInstruction (MkInstruction direction amount) pos =
   case direction of
@@ -137,14 +137,14 @@ addInstruction (MkInstruction direction amount) pos =
 ```
 And of course to supply it with a 'starting value' (in this case `V2 0 0`)
 So part 1 becomes:
-```
+```haskell
 part1 :: [Instruction] -> Integer
 part1 = (\(V2 x y) -> x * y) . foldl' (flip addInstruction) (V2 0 0)
 ```
 the 'flip' is because `addInstruction` takes an `Instruction` first, then a `Position`, whereas foldl' needs it to be the other way around (ie a -> b -> a). Flip will just reverse the order of the two parameters.
 
 For part 2, we need more state than just position. Now it's position and aim:
-```
+```haskell
 data PositionWithAim =
   MkPositionWithAim
     { _position :: Position
@@ -153,7 +153,7 @@ data PositionWithAim =
   deriving (Show, Eq)
 ```
 Which makes our aggregating function look like this:
-```
+```haskell
 addInstructionWithAim :: Instruction -> PositionWithAim -> PositionWithAim
 addInstructionWithAim (MkInstruction direction amount) (MkPositionWithAim position aim) =
   case direction of
