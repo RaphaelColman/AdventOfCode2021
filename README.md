@@ -8,6 +8,7 @@
 - [Write up](#write-up)
     - [Day 1](#day-1)
     - [Day 2](#day-2)
+  - [Day 3](#day-3)
 
 ### Overview
 This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
@@ -161,3 +162,101 @@ addInstructionWithAim (MkInstruction direction amount) (MkPositionWithAim positi
     Forward -> MkPositionWithAim (position + V2 amount (aim * amount)) aim
 ```
 Bring on day 3!
+
+## Day 3
+To be honest, I found today quite hard! That doesn't bode well as it's only day 3. I might have found it easier if I knew how to use [Data.Bits](https://hackage.haskell.org/package/binary-0.7.1.0/docs/Data-Binary-Get-Internal.html#v:getByteString) but after some wasted time reading the docs, I decided I would be better off just implementing a naive version that I could actually understand.
+```haskell
+data BinaryDigit
+  = ZERO
+  | ONE
+  deriving (Eq, Show, Enum, Ord)
+```
+So part 1 is made easy by the super-handy `transpose` from `Data.List`
+```
+transpose [[1,2,3],[4,5,6]]
+[[1,4],[2,5],[3,6]]
+```
+Which makes the implementation really simple in the end:
+```haskell
+part1 :: [[BinaryDigit]] -> Integer
+part1 bd = gamma * epsilon
+  where
+    gamma = toDecimal $ map mostCommon $ transpose bd
+    epsilon = toDecimal $ map leastCommon $ transpose bd
+```
+`toDecimal` is just a function which zips through a `BinaryDigit` and multiplies it by the corresponding power of 2 (so we can geta decimal at the end)
+The `mostCommon` and `leastCommon` functions are just helpers for list which do what they say on the tin. Did you see how `BinaryDigit` derives `Ord`? That means
+Haskell will use the order you've declared the data constructures to implement the `Ord` typeclass. We get the added bonus that it will take `ONE` as the tie-breaker in `mostCommon` and `ZERO` as the tie-breaker in `leastCommon`. That's lucky, because it's required for the puzzle!
+```haskell
+toDecimal :: [BinaryDigit] -> Integer
+toDecimal bd = sum $ zipWith (*) (reverse asIntList) [2 ^ n | n <- [0,1 ..]]
+  where
+    asIntList = map chToInt bd
+    chToInt ch =
+      case ch of
+        ZERO -> 0
+        ONE  -> 1
+
+```
+Unfortunately, part 2 is significantly harder. Simply mapping through a transposed list won't work anymore because we're mutating the list as we go. I spent a while trying to figure out a clever way of doing this,
+then eventually I gave up and decided to just use recursion. Any time you want to do the same sort of thing as a while loop in Haskell, you can achieve it by defining some state for your loop first:
+```haskell
+data ReadState =
+  MkReadState
+    { _index  :: Int
+    , _values :: [Seq BinaryDigit]
+    }
+  deriving (Eq, Show)
+```
+`Seq` is from `Data.Sequence` - much better than plain old list because you can easily retrieve values for indexes.
+Then we can define a function to take a ReadState and 'progress' to the next iteration of the loop (we'll do it for the oxygen generator rating first - the 'most common' bit)
+```haskell
+stepReadState :: ReadState -> Maybe ReadState
+stepReadState (MkReadState index values) = do
+  digits <- mapM (S.lookup index) values
+  let n = mostCommon digits
+  let newValues =
+        filter
+          (\x ->
+             let lookedUp = S.index x index
+              in n == lookedUp)
+          values
+  pure $ MkReadState (index + 1) newValues
+```
+What's this `mapM` thing? It's a convenience function around Monads. In this case, it will take a function which returns a `Maybe`, map it over a list of something, and instead of creating a list of Maybes, it will convert it to `Maybe List`. The actual type signature:
+```haskell
+mapM :: (Traversable t, Monad m) => (a -> m b) -> t a -> m (t b)
+```
+So in this case, if `S.lookup` failed to find anything and returned a `Nothing`, the entire list (`digits`) would be `Nothing`.
+
+Now we can get from one ReadState to another, we can use recursion to loop through until some condition is met (in this case, there is only one value in the list of values)
+```haskell
+runReadState' :: ReadState -> Maybe [BinaryDigit]
+runReadState' rs@(MkReadState index values)
+  | length values == 1 =
+    let value = head values
+     in pure $ toList value
+  | otherwise = stepReadState rs >>= runReadState
+```
+This might look a little daunting, but it helps to read it line by line. It will first check the ReadState you've passed in. Specifically, it will check the length of the `values` field. If that values field is length 1, it will just return it. That's our "base case". In all other cases, it will step the ReadState once and then recurse. We've had to to use `>>=` because both `StepReadState` and `runReadState` return a `Maybe`, so we use monads to bind them together into one `Maybe`. We don't normally use `>>=` that much because we would use the `Do` notation to achieve the same thing instead.
+Of course, this had the `mostCommon` function hard-coded in. We can parameterise that as well:
+```haskell
+runReadState ::
+     ([BinaryDigit] -> BinaryDigit) -> ReadState -> Maybe [BinaryDigit]
+runReadState f rs@(MkReadState index values)
+  | length values == 1 =
+    let value = head values
+     in pure $ toList value
+  | otherwise = stepReadState f rs >>= runReadState f
+```
+Which means part 2 looks something like this:
+```haskell
+part2 :: [[BinaryDigit]] -> Maybe Integer
+part2 bd = do
+  let rs = initReadState bd
+  oxyGen <- toDecimal <$> runReadState mostCommon rs
+  co2Scrub <- toDecimal <$> runReadState leastCommon rs
+  pure $ oxyGen * co2Scrub
+```
+
+This took me an absurd amount of time this morning, partly because I was desperate to finder a neater way of doing than explicit recursion. I also realised that my `AoCSolution` forces you to parse to the same structure for both part 1 and part 2 - almost always the case, but it was annoying today because I had parsed much more naively for part 1 (I just made a list of strings). I'll try and find some time today to separate those out so you can treat the two parts of the puzzle more independently.

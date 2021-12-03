@@ -1,4 +1,6 @@
-module Solutions.Day3 where
+module Solutions.Day3
+  ( aoc3
+  ) where
 
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions, printTestSolutions)
@@ -49,11 +51,9 @@ part1 bd = gamma * epsilon
 part2 :: [[BinaryDigit]] -> Maybe Integer
 part2 bd = do
   let rs = initReadState bd
-  oxyGen <- doReadState mostCommon rs
-  let oxyGenValue = extractReadStateResult oxyGen
-  co2Scrub <- doReadState leastCommon rs
-  let co2ScrubValue = extractReadStateResult co2Scrub
-  pure $ oxyGenValue * co2ScrubValue
+  oxyGen <- toDecimal <$> runReadState mostCommon rs
+  co2Scrub <- toDecimal <$> runReadState leastCommon rs
+  pure $ oxyGen * co2Scrub
 
 initReadState :: [[BinaryDigit]] -> ReadState
 initReadState input = MkReadState 0 $ map S.fromList input
@@ -70,17 +70,13 @@ stepReadState f (MkReadState index values) = do
           values
   pure $ MkReadState (index + 1) newValues
 
-doReadState :: ([BinaryDigit] -> BinaryDigit) -> ReadState -> Maybe ReadState
-doReadState f rs =
-  let stepped = stepReadState f rs
-   in case stepped of
-        Just readState -> doReadState f readState
-        Nothing        -> pure rs
-
-extractReadStateResult :: ReadState -> Integer
-extractReadStateResult (MkReadState _ values) =
-  let only = head values
-   in toDecimal $ toList only
+runReadState ::
+     ([BinaryDigit] -> BinaryDigit) -> ReadState -> Maybe [BinaryDigit]
+runReadState f rs@(MkReadState index values)
+  | length values == 1 =
+    let value = head values
+     in pure $ toList value
+  | otherwise = stepReadState f rs >>= runReadState f
 
 mostCommon :: Ord a => [a] -> a
 mostCommon = snd . maximum . map (\xs -> (length xs, head xs)) . group . sort
