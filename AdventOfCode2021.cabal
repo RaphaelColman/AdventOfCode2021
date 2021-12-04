@@ -28,6 +28,7 @@ library
       Common.AoCSolutions
       Common.EnumUtils
       Common.FileUtils
+      Common.FunctorUtils
       Common.Geometry
       Common.ListUtils
       Lib
