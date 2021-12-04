@@ -31,6 +31,7 @@ library
       Common.FunctorUtils
       Common.Geometry
       Common.ListUtils
+      Common.MaybeUtils
       Lib
       Solutions.Day1
       Solutions.Day10
