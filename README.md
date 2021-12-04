@@ -8,7 +8,8 @@
 - [Write up](#write-up)
     - [Day 1](#day-1)
     - [Day 2](#day-2)
-  - [Day 3](#day-3)
+    - [Day 3](#day-3)
+    - [Day 4](#day-4)
 
 ### Overview
 This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
@@ -163,7 +164,7 @@ addInstructionWithAim (MkInstruction direction amount) (MkPositionWithAim positi
 ```
 Bring on day 3!
 
-## Day 3
+### Day 3
 To be honest, I found today quite hard! That doesn't bode well as it's only day 3. I might have found it easier if I knew how to use [Data.Bits](https://hackage.haskell.org/package/binary-0.7.1.0/docs/Data-Binary-Get-Internal.html#v:getByteString) but after some wasted time reading the docs, I decided I would be better off just implementing a naive version that I could actually understand.
 ```haskell
 data BinaryDigit
@@ -254,3 +255,91 @@ part2 bd = do
 ```
 
 This took me an absurd amount of time this morning, partly because I was desperate to finder a neater way of doing it than explicit recursion. I also realised that my `AoCSolution` forces you to parse to the same structure for both part 1 and part 2 - almost always the case, but it was annoying today because I had parsed much more naively for part 1 (I just made a list of strings). I'll try and find some time today to separate those out so you can treat the two parts of the puzzle more independently.
+
+### Day 4
+This one felt quite similar to yesterday, but not quite as difficult. Again you have to iterate through some state until a condition is met. The notion of playing bingo with a giant squid definitely made me smile.
+
+This is the first puzzle where I felt I had an advantage at the parsing stage, because Haskell's parser combinators are so nice.
+```haskell
+type Board = [[BingoSquare]]
+
+type Numbers = [Integer]
+
+type BingoSquare = (Integer, Bool)
+
+data Bingo =
+  MkBingo
+    { _boards        :: [Board]
+    , _numbers       :: Numbers
+    , _calledNumbers :: Numbers
+    , _winners       :: [Board]
+    }
+  deriving (Eq, Show)
+
+parseInput :: Parser Bingo
+parseInput = do
+  nums <- commaSep integer
+  whiteSpace
+  boardNumbers <- some $ count 5 $ count 5 integer
+  let boards = fmap3 (, False) boardNumbers
+  pure $ MkBingo boards nums [] []
+```
+The `count` parser lets me specify that I want to parse an exact number of something - in this case 5 integers. I love these parsers because I think reading them is so much easier than the `splitBy ','` nonsense you have to do in other langauges.
+
+So once again, we define some state (our `Bingo` type) and define a way to step from one state to the other. In this case, every time we call a number we'll add it to _calledNumbers, and every time a board wins, we'll take it out of _boards and put it in _winners. So we need a way of checking if a board has won. `transpose` to the rescue again!
+```haskell
+checkBoard :: Board -> Bool
+checkBoard board =
+  let rowsComplete = any (all snd) board
+      columnsComplete = any (all snd) $ transpose board
+   in rowsComplete || columnsComplete
+```
+`snd` just gets the second item in a tuple (the Boolean representing whether the number has been crossed out).
+
+After that, we just define a way of getting from one board to the next: `stepBoard`. The important logic here is to ignore the `BingoSquare` if the Boolean in it is `True` (it has already been crossed out in some previous step), and otherwise to check the value against whatever is being called out.
+```haskell
+stepBingo :: Bingo -> Maybe Bingo
+stepBingo bingo@(MkBingo boards numbers calledNumbers winners)
+  | null numbers = Nothing
+  | otherwise = do
+    let newBoards = fmap3 checkSquare boards
+        checkSquare sq@(n, checked) =
+          if checked
+            then sq
+            else (n, n == head numbers)
+    let (newWinners, losers) = partition checkBoard newBoards
+    pure $
+      MkBingo
+        losers
+        (tail numbers)
+        (head numbers : calledNumbers)
+        (newWinners ++ winners)
+```
+We have to take it on trust that only one board will win at at time (at least for the first and last winners). It's that trust which means we have to do the ugly `++` at the end (concatening two lists). Notice that we don't have to when adding the most recently called number to `calledNumber` because we know there's only one thing to add.
+
+NB: Why is `++` ugly? It's not that ugly, but it does force us to evaluate all the way down the spine of the first list (although without having to evaluate the values inside). It needs to evaluate the final spine in the first list so that it can attach it to the first spine in the second. If it weren't for the `++` here, everything would stay beautifully lazy. :(
+
+By the way, `fmap3` is a helper for functors I added this morning. It allows you to get at the value nested inside 3 functors (so it's just `fmap . fmap . fmap`). Here, we have a list of lists of lists (each Board is 2-dimensional and we have a list of boards). `fmap3` lets you map over the value (the `BingoSquare` tuple) inside.
+
+After that, part 1 and 2 are almost identical. In part 1 we run until we get our first winner. For part 2 we run until there are no boards left:
+```haskell
+runBingo :: Bingo -> Maybe Integer
+runBingo bingo@(MkBingo boards numbers calledNumbers winners)
+  | null winners = stepBingo bingo >>= runBingo
+  | otherwise = pure $ evaluateBoard (head winners) (head calledNumbers)
+
+runBingoUntilLast :: Bingo -> Maybe Integer
+runBingoUntilLast bingo@(MkBingo boards numbers calledNumbers winners)
+  | null boards = pure $ evaluateBoard (head winners) (head calledNumbers)
+  | otherwise = stepBingo bingo >>= runBingoUntilLast
+```
+This should look familiar. It's the same anamorphic structure we had from yesterday's puzzle. If I were clever enough to use [this recursion-schemes library](https://hackage.haskell.org/package/recursion-schemes) then I probably wouldn't need to duplicate so much code, but understanding all the different morphisms makes my head spin.
+
+To actually get the answer out you have to add all the unmarked squares together and multiply them by the last called number. This is, of course, a simple map/filter/fold operation provided you first concatenate all the rows together into one list: 
+```haskell
+evaluateBoard :: Board -> Integer -> Integer
+evaluateBoard board lastCalled =
+  let unmarkedSum = sum $ map fst $ filter (not . snd) $ concat board
+   in unmarkedSum * lastCalled
+```
+The weather is awful today. Maybe I'll just stay inside and learn more Haskell.
