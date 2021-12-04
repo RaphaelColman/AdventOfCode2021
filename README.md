@@ -342,4 +342,4 @@ evaluateBoard board lastCalled =
   let unmarkedSum = sum $ map fst $ filter (not . snd) $ concat board
    in unmarkedSum * lastCalled
 ```
-The weather is awful today. Maybe I'll just stay inside and learn more Haskell.
+The weather is awful today. Maybe I'll just stay inside and [learn more Haskell](https://media.giphy.com/media/Cz6TlrRVVyv9S/giphy.gif).
