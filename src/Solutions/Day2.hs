@@ -11,7 +11,8 @@ import           Text.Trifecta       (Parser, TokenParsing (token), integer,
 
 aoc2 :: IO ()
 aoc2 = do
-  printSolutions 2 $ MkAoCSolution parseInput part1 part2
+  printSolutions 2 $ MkAoCSolution parseInput part1
+  printSolutions 2 $ MkAoCSolution parseInput part2
 
 data Direction
   = Forward

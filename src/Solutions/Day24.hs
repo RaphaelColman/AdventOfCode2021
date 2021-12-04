@@ -8,7 +8,8 @@ import           Text.Trifecta       (Parser)
 
 aoc24 :: IO ()
 aoc24 = do
-  printSolutions 24 $ MkAoCSolution parseInput part1 part2
+  printSolutions 24 $ MkAoCSolution parseInput part1
+  printSolutions 24 $ MkAoCSolution parseInput part2
 
 parseInput :: Parser String
 parseInput = undefined

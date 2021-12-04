@@ -14,7 +14,8 @@ import           Text.Trifecta       (Parser, TokenParsing (token), digit, some)
 
 aoc3 :: IO ()
 aoc3 = do
-  printSolutions 3 $ MkAoCSolution parseInput part1 part2
+  printSolutions 3 $ MkAoCSolution parseInput part1
+  printSolutions 3 $ MkAoCSolution parseInput part2
 
 data ReadState =
   MkReadState

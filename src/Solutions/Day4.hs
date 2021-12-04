@@ -14,7 +14,8 @@ import           Text.Trifecta       (Parser, commaSep, count, integer, some,
 
 aoc4 :: IO ()
 aoc4 = do
-  printSolutions 4 $ MkAoCSolution parseInput part1 part2
+  printSolutions 4 $ MkAoCSolution parseInput part1
+  printSolutions 4 $ MkAoCSolution parseInput part2
 
 type Board = [[BingoSquare]]
 

@@ -10,7 +10,8 @@ import           Text.Trifecta       (Parser, TokenParsing (token), integer,
 
 aoc1 :: IO ()
 aoc1 = do
-  printSolutions 1 $ MkAoCSolution parseInput part1 part2
+  printSolutions 1 $ MkAoCSolution parseInput part1
+  printSolutions 1 $ MkAoCSolution parseInput part2
 
 type Depths = [Integer]
 
