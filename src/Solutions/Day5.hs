@@ -4,9 +4,9 @@ import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions, printTestSolutions)
 import           Common.ListUtils    (freqs)
 import           Control.Lens        ((^.))
+import           Data.List           (groupBy)
 import qualified Data.Map            as M
-import           Debug.Trace
-import           Linear.V2
+import           Linear.V2           (R1 (_x), R2 (_y), V2 (..))
 import           Text.Trifecta       (CharParsing (string), Parser, comma,
                                       commaSep, integer, newline, some,
                                       whiteSpace)
@@ -33,33 +33,26 @@ parseLine = do
 
 part1 :: [Line] -> Int
 part1 lines =
-  let horizontals = filter isHorizontal lines
-      hPoints = concatMap horizontalPointsCovered horizontals
-      verticals = filter isVertical lines
-      vPoints = concatMap verticalPointsCovered verticals
-      frqs = freqs $ hPoints ++ vPoints
-      overlaps = M.filter (>= 2) frqs
-   in M.size overlaps
+  let orthogonals = filter (\l -> isHorizontal l || isVertical l) lines
+   in M.size $ M.filter (>= 2) $ freqs $ concatMap pointsCovered orthogonals
 
 part2 :: [Line] -> Int
 part2 lines =
-  let horizontals = filter isHorizontal lines
-      hPoints = concatMap horizontalPointsCovered horizontals
-      verticals = filter isVertical lines
-      vPoints = concatMap verticalPointsCovered verticals
-      rest = filter (\l -> not (isHorizontal l) && not (isVertical l)) lines
-      dPoints = concatMap diagonalPointsCovered rest
-      frqs = freqs $ hPoints ++ vPoints ++ dPoints
-      overlaps = M.filter (>= 2) frqs
-   in M.size overlaps
+  let frqs = freqs $ concatMap pointsCovered lines
+   in M.size $ M.filter (>= 2) frqs
+
+pointsCovered :: Line -> [Point]
+pointsCovered line
+  | isHorizontal line = horizontalPointsCovered line
+  | isVertical line = verticalPointsCovered line
+  | otherwise = diagonalPointsCovered line
 
 horizontalPointsCovered :: Line -> [Point]
 horizontalPointsCovered (V2 x1 y1, V2 x2 y2) =
-  map (`V2` y1) [(min x1 x2) .. (max x1 x2)]
+  map (`V2` y1) $ flexibleRange x1 x2
 
 verticalPointsCovered :: Line -> [Point]
-verticalPointsCovered (V2 x1 y1, V2 x2 y2) =
-  map (V2 x1) [(min y1 y2) .. (max y1 y2)]
+verticalPointsCovered (V2 x1 y1, V2 x2 y2) = map (V2 x1) $ flexibleRange y1 y2
 
 diagonalPointsCovered :: Line -> [Point]
 diagonalPointsCovered (V2 x1 y1, V2 x2 y2) =

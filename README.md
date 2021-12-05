@@ -10,6 +10,7 @@
     - [Day 2](#day-2)
     - [Day 3](#day-3)
     - [Day 4](#day-4)
+    - [Day 5](#day-5)
 
 ### Overview
 This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
@@ -343,3 +344,69 @@ evaluateBoard board lastCalled =
    in unmarkedSum * lastCalled
 ```
 The weather is awful today. Maybe I'll just stay inside and [learn more Haskell](https://media.giphy.com/media/Cz6TlrRVVyv9S/giphy.gif).
+
+### Day 5
+Busy day today, so I'm going to keep the write-up brief. We have more 2d geometry to do, so I'm pleased to announce the return of [V2](https://hackage.haskell.org/package/linear-1.20.7/docs/Linear-V2.html) which I will pretty much always use to describe points in space and vectors. I ended up with data types that look like this:
+```haskell
+type Point = V2 Integer
+type Line = (Point, Point)
+```
+That makes a nice change from the more complicated data types I normally make! Part one of the puzzle tells us that we only need to worry about getting the points covered by horizontal and vertical lines. That's a relief. First, we can easily tell if lines are horizontal or vertical by checking if their x or y value stays the same between both points.
+```haskell
+isHorizontal :: Line -> Bool
+isHorizontal (v1, v2) = v1 ^. _y == v2 ^. _y
+
+isVertical :: Line -> Bool
+isVertical (v1, v2) = v1 ^. _x == v2 ^. _x
+```
+I know the `^._x` stuff is a bit of an eyesore. Linear.V2 uses the [lens](https://hackage.haskell.org/package/lens) library which has a whole bunch of symbols to shorthand getters and setters. In this case, you can read ^. as 'get'
+
+Next up, we need to be able to enumerate all the points covered by a horizontal or vertical line. We can use 'ranges' to make this part easy.
+```
+λ: [1..5]
+[1,2,3,4,5]
+λ: [5,4..1]
+[5,4,3,2,1]
+```
+I added a helper function to make descending ranges a little easier:
+```haskell
+flexibleRange :: Integer -> Integer -> [Integer]
+flexibleRange a b
+  | b >= a = [a .. b]
+  | otherwise = [a,(a - 1) .. b]
+```
+So now we can just enumerate some points by mapping over a texas range:
+```haskell
+horizontalPointsCovered :: Line -> [Point]
+horizontalPointsCovered (V2 x1 y1, V2 x2 y2) =
+  map (`V2` y1) $ flexibleRange x1 x2
+
+verticalPointsCovered :: Line -> [Point]
+verticalPointsCovered (V2 x1 y1, V2 x2 y2) = map (V2 x1) $ flexibleRange y1 y2
+```
+
+Part two makes us worry about diagonals, but fortunately the diagonals are all 45 degrees, so we don't have to do anything complicated:
+```haskell
+diagonalPointsCovered :: Line -> [Point]
+diagonalPointsCovered (V2 x1 y1, V2 x2 y2) =
+  zipWith V2 (flexibleRange x1 x2) (flexibleRange y1 y2)
+```
+If anything, I would say that's simpler than the horizontal and vertical versions.
+
+Finally, we need something to list out the points covered by any of the lines:
+```haskell
+pointsCovered :: Line -> [Point]
+pointsCovered line
+  | isHorizontal line = horizontalPointsCovered line
+  | isVertical line = verticalPointsCovered line
+  | otherwise = diagonalPointsCovered line
+```
+
+Then we combine it all together by enumerating all the points covered, tallying up the frequency of each one (a helper function here called `freqs`) and listing all those with a count above 2. I'll put part 2 in here, and you can just trust that part 1 is exactly the same except we filter out all the diagonal lines first:
+```haskell
+part2 :: [Line] -> Int
+part2 lines =
+  let frqs = freqs $ concatMap pointsCovered lines
+   in M.size $ M.filter (>= 2) frqs
+```
+My original version was totally ugly - it involved traversing the list multiple times (once for horizontals, once for verticals etc). I'm glad I cleaned it up. The naive solution here worked a treat, but I spoke to a friend today who implemented it properly using `y=mx+c` so it could handle any kind of diagonal line, whether it was 45 degrees or not. Sounds satisfying, if a little harder.
