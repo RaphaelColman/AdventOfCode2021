@@ -11,6 +11,7 @@
     - [Day 3](#day-3)
     - [Day 4](#day-4)
     - [Day 5](#day-5)
+    - [Day 6](#day-6)
 
 ### Overview
 This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
@@ -410,3 +411,52 @@ part2 lines =
    in M.size $ M.filter (>= 2) frqs
 ```
 My original version was totally ugly - it involved traversing the list multiple times (once for horizontals, once for verticals etc). I'm glad I cleaned it up. The naive solution here worked a treat, but I spoke to a friend today who implemented it properly using `y=mx+c` so it could handle any kind of diagonal line, whether it was 45 degrees or not. Sounds satisfying, if a little harder.
+
+### Day 6
+Ah, the classic, 'now try with a bigger number because your implementation is probably really slow!' puzzle part 2. I confess, my first solution to part 2 was truly idiotic - I hadn't really internalised how the order of the fish just doesn't matter, so I grouped the ones that were next to each other together but still just kept them in a list. My solution was fast enough, but pretty ugly. I've now rewritten it to be neater. First off, we define how we're keeping track of our fish:
+```haskell
+type Age = Integer
+
+type FishColony = M.Map Age Integer
+```
+The 'age' type alias isn't really necessary, but it helps me keep track of what the keys are in the map vs what the values are. Our strategy is going to be to first add all the newborn fish as 9s. That way, we can decrement everyone together. Our decrement is simple: just wrap back around to 6 if your age goes below 0:
+```haskell
+modularDecrement :: Integer -> Integer
+modularDecrement i =
+  let aged = i - 1
+   in if aged < 0
+        then 6
+        else aged
+```
+(we can't use the modulo operator here because it's legitimate to have ages above 6)
+
+Haskell's Data.Map library has lots of useful functions for interacting with maps in the ways we need. We can define a 'step' like this:
+```haskell
+stepFishColony :: FishColony -> FishColony
+stepFishColony fc = aged
+  where
+    numZeros = M.findWithDefault 0 0 fc
+    newFish = M.insert 9 numZeros fc
+    aged = M.filter (/= 0) $ M.mapKeysWith (+) modularDecrement newFish
+```
+`M.mapKeysWith` is super useful here. We map over the keys in the original map, but pass in a function to combine values if we end up with duplicate keys:
+```haskell
+mapKeysWith :: Ord k2 => (a -> a -> a) -> (k1 -> k2) -> Map k1 a -> Map k2 a
+```
+That can happen to us here, because some fish might be decrementing from 7->6 at the same time as fish with age 0 are wrapping back around to 6. We just pass in `(+)` to add them together in that case.
+
+Then our run function is simple. We just use `iterate` to produce a lazy infinite list of all steps, then grab the index out of it corresponding to number of steps we actually want to evaluate.
+```haskell
+runFishColony :: Int -> FishColony -> Integer
+runFishColony times fc = M.foldr (+) 0 $ iterate stepFishColony fc !! times
+```
+
+So our solution becomes:
+```haskell
+part1 :: [Integer] -> Integer
+part1 = runFishColony 80 . freqs
+
+part2 :: [Integer] -> Integer
+part2 = runFishColony 256 . freqs
+```
+I've been getting up early because I'm excited about solving the day's puzzle, but I must admit my first passes at it are normally bonkers. Maybe I'd do better tackling them later on in the day when I've [woken up properly](https://media.giphy.com/media/3o6gb2rfGKb55YE9lC/giphy.gif).
