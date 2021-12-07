@@ -12,6 +12,7 @@
     - [Day 4](#day-4)
     - [Day 5](#day-5)
     - [Day 6](#day-6)
+    - [Day 7](#day-7)
 
 ### Overview
 This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
@@ -460,3 +461,42 @@ part2 :: [Integer] -> Integer
 part2 = runFishColony 256 . freqs
 ```
 I've been getting up early because I'm excited about solving the day's puzzle, but I must admit my first passes at it are normally bonkers. Maybe I'd do better tackling them later on in the day when I've [woken up properly](https://media.giphy.com/media/3o6gb2rfGKb55YE9lC/giphy.gif).
+
+### Day 7
+Gah! I got tripped up today because I forgot how to divide numbers. Haskell is a great language, but I always forget that `/` is for fractionals and `div` is for integrals.
+
+So for part 1, we need to find the integer that is itself closest to all the other integers in a list. The output of part 1 should be that distance. We can just generate a range from 1 -> the maximum number in the list and then test each number against all the numbers in the original list.
+```haskell
+bestPosition :: [Integer] -> Integer
+bestPosition xs = minimum $ map totalFuel [1 .. maximum xs]
+  where
+    totalFuel x = sum $ map (abs . (x -)) xs
+```
+Not rocket science (well [actually](https://media.giphy.com/media/RMwZypp489fuGBI0Ti/giphy.gif) I guess technically kind of is).
+
+Then for part 2 we find out that we're calculating fuel wrong. It's not the difference between the two positions - you have to add 1 to the fuel consumed for each step. So 0 -> 5 is 1 + 2 + 3 + 4 + 5 = 15
+The solution, of course, is [triangle numbers](https://en.wikipedia.org/wiki/Triangular_number)! The triangle number formula is: n(n+1)/2
+
+So we can simply substitute our fuel calculation function for the triangle number formula.
+```haskell
+calculateFuel :: Integer -> Integer -> Integer
+calculateFuel a b = triangleX $ abs $ a - b
+  where
+    triangleX x = x * (x + 1) `div` 2
+
+bestPosition :: (Integer -> Integer -> Integer) -> [Integer] -> Integer
+bestPosition f xs = minimum $ map totalFuel [1 .. maximum xs]
+  where
+    totalFuel x = sum $ map (f x) xs
+```
+(This is where I spent ages trying to get `/` to work because I forgot that you use `div` for Integers)
+
+Our part 1 and 2 becomes:
+```haskell
+part1 :: [Integer] -> Integer
+part1 = bestPosition (\a b -> abs (a - b))
+
+part2 :: [Integer] -> Integer
+part2 = bestPosition calculateFuel
+```
+I promise Haskell is fun to use even though I sometimes fail to do the most basic stuff in it!
