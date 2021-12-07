@@ -376,7 +376,7 @@ flexibleRange a b
   | b >= a = [a .. b]
   | otherwise = [a,(a - 1) .. b]
 ```
-So now we can just enumerate some points by mapping over a texas range:
+So now we can just enumerate some points by mapping over a range:
 ```haskell
 horizontalPointsCovered :: Line -> [Point]
 horizontalPointsCovered (V2 x1 y1, V2 x2 y2) =
