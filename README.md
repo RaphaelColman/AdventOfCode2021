@@ -13,6 +13,7 @@
     - [Day 5](#day-5)
     - [Day 6](#day-6)
     - [Day 7](#day-7)
+    - [Day 8](#day-8)
 
 ### Overview
 This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
@@ -500,3 +501,98 @@ part2 :: [Integer] -> Integer
 part2 = bestPosition calculateFuel
 ```
 I promise Haskell is fun to use even though I sometimes fail to do the most basic stuff in it!
+
+### Day 8
+Phew! That was definitely the hardest one so far! I liked it a lot though - I love how it seemed impregnable at the start, but once you realise a sensible way of doing it it rapidly becomes simpler to do.
+Part 1 was pretty trivial to solve, so I'm not going to bother explaining it. Let's first talk about a general approach for solving part 2. Given an input like this:
+```
+acedgfb cdfbe gcdfa fbcad dab cefabd cdfgeb eafb cagedb ab | cdfeb fcadb cdfeb cdbaf
+```
+We need to figure out what digits all the 'combos' on the left correspond to so we can 'translate' the combos on the right. There's a convenient table on the [wikipedia page](https://en.wikipedia.org/wiki/Seven-segment_display#Hexadecimal) for seven-segment displays which also labels each section of the display with a letter and then enumerates which combinations correspond to which integer.
+For example:
+```
+0 =  "abcdef"
+1 =  "bc"
+etc.
+```
+You can think of this as the 'true mapping'. If our wires weren't all crossed for each input, we'd be done! The problem is that number 1 is represented as "ab" in the input, but as "bc" in the 'true mapping'. That means either:
+```
+a -> b
+b -> c
+```
+OR
+```
+a -> c
+b -> b
+```
+More generally, there exists some lookup table where you can plug in the letter from the input, and out will come the correct letter from the 'true mapping'. In this case:
+```
+a -> b, b -> c, c -> d, d -> a, e -> f and g -> e
+```
+It's actually possible to figure out what the lookup table is like a sudoku puzzle (the ones with fixed lengths narrow it down, then you can reason out other combinations based on which letters are missing etc) but that's hideously complicated to implement in the code. An easier way to do it is simply to try every possible lookup table (there are only 5040) until we find one which works (ie if you were to use the lookup table to map your input to some other list of letter combinations, then look up the integer in the 'true mapping' table, you would successfully get numbers out of it for all 10 items in the input)
+
+So now we can start adding things to make the solution simpler. Let's start with some modelling:
+```haskell
+type Combo = S.Set Char
+type Entry = ([Combo], [Combo])
+type Mapping = M.Map Char Char
+```
+Combo is a set of characters (like 'cdfbe'). I've made it a Set so we're all clear that the order of the characters does not matter. An entry can just then be a tuple of two lists of combos (input and output)
+I'm using 'Mapping' to indicate a map of a -> b, b -> c etc
+
+Next we need a representation of the [one true mapping](https://media.giphy.com/media/3o7abspvhYHpMnHSuc/giphy.gif) (the one from wikipedia)
+```haskell
+knownCombos :: M.Map Combo Integer
+knownCombos = M.fromList $ zip combos [0 .. 9]
+  where
+    combos =
+      map
+        S.fromList
+        [ "abcdef"
+        , "bc"
+        , "abdeg"
+        , "abcdg"
+        , "bcfg"
+        , "acdfg"
+        , "acdefg"
+        , "abc"
+        , "abcdefg"
+        , "abcdfg"
+        ]
+```
+Not worring about crossed wires: if I were to look up a combo in here, I should get an Integer back out.
+Next, we know that given a mapping and a list of combos, we'll need to translate it into a list of integers (for now we'll assume that we've got the correct mapping from somewhere)
+```haskell
+decodeCombos :: Mapping -> [Combo] -> Maybe [Integer]
+decodeCombos mapping = traverse (decodeCombo mapping)
+  where
+    decodeCombo mapping' combo' =
+      let mapped = S.map (mapping' M.!) combo'
+       in M.lookup mapped knownCombos
+```
+Remember how I used `mapM` in a previous puzzle? `traverse` is the same thing, but I think it's newer. The point is here that we attempt to use the mapping to create our list of ints. If we didn't find our particular combo in the 'true mapping', then `M.lookup` will return a `Nothing`, and `traverse` will ensure that the entire function returns a `Nothing` in that case rather than a list of `Maybe`s
+
+We're actually pretty close to done! We need to generate a list of all 5040 mappings now:
+```haskell
+allMappings :: [Mapping]
+allMappings = map (curry toMapping "abcdefg") (permutations "abcdefg")
+  where
+    toMapping (str1, str2) = M.fromList $ zip str1 str2
+```
+We just zip 'abcdefg' together with the result of the handy 'permutations' function, which takes a list (strings are just lists of chars) and returns a list of all its permutations. 5040 isn't such a big number, but we get the lovely benefit that Haskell lists are completely lazy, so this list can be generated instantly and we'll only evaluate it as far as we need to when we use it.
+
+So now the logic is like this: For an entry, go through all the possible mappings and attempt to use that mapping. If we succeeded in using the mapping for all 10 combos in the entry, then we can safely assume that it's the correct mapping and we can use it to translate the 'output' part of the entry.
+```haskell
+tryMappings :: Entry -> Maybe Integer
+tryMappings (wires, output) = do
+  goodMapping <- find (isJust . (`decodeCombos` wires)) allMappings
+  decoded <- decodeCombos goodMapping output
+  pure $ read (concatMap show decoded)
+```
+The first line will find the first item in `allMappings` where if you were to use `decodeCombos` on it, the answer would be a `Just` and not a `Nothing`. After that, we decode the output using our mapping. That means decoded will be something like `[5,3,5,3]` which we need to convert to the integer `5353`. We can just convert each integer to a string, concatenate and read for that.
+And we're done! You have to sum all the outputs of that, so part 2 looks like this:
+```haskell
+part2 :: [Entry] -> Maybe Integer
+part2 entries = sum <$> traverse tryMappings entries
+```
+It's really satisying that the solution here is actually quite compact, considering how complicated the problem seemed initially. I'm keeping my fingers crossed that this was a random spike in difficulty, otherwise there's no way I'll be able to keep up from here onwards.
