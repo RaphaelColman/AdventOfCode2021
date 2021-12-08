@@ -3,7 +3,7 @@
 module Web.AoCUtils
   ( getPuzzleInput
   , getTestPuzzleInput
-  , ConfigError
+  , ConfigError(MkGenericConfigError)
   ) where
 
 import           Advent
