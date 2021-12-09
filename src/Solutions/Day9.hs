@@ -35,8 +35,8 @@ part2 str = first * second * third
   where
     grid = initMap str
     lowPoints' = M.keys $ lowPoints grid
-    basins = map (\p -> runExplore (MkState S.empty [p] grid)) lowPoints'
-    first:second:third:rest = reverse $ sort $ map S.size basins
+    basins = map (doSearch grid) lowPoints'
+    first:second:third:_ = take 3 $ reverse $ sort $ map S.size basins
 
 lowPoints :: Grid -> Grid
 lowPoints grid = lowPoints
@@ -52,33 +52,19 @@ allDirections = [unit _x, -unit _x, unit _y, -unit _y]
 allAdjacents :: V2 Int -> [V2 Int]
 allAdjacents v = map (v +) allDirections
 
-data ExploreState =
-  MkState
-    { _searched :: S.Set (V2 Int)
-    , _toSearch :: [V2 Int]
-    , _grid     :: Grid
-    }
-  deriving (Eq, Show)
-
-explore :: Grid -> V2 Int -> [V2 Int]
-explore grid coord = coord : filter passes (allAdjacents coord)
+explore' :: Grid -> V2 Int -> S.Set (V2 Int)
+explore' grid point = S.fromList $ filter higherAdjacent (allAdjacents point)
   where
-    passes adjCoord =
-      M.member adjCoord grid &&
-      grid M.! adjCoord > grid M.! coord && grid M.! adjCoord /= 9
+    higherAdjacent adjPoint =
+      case M.lookup adjPoint grid of
+        Just p  -> p > grid M.! point && p /= 9
+        Nothing -> False
 
-stepExplore :: ExploreState -> ExploreState
-stepExplore (MkState searched toSearch grid) =
-  MkState newSearched newToSearch grid
+doSearch :: Grid -> V2 Int -> S.Set (V2 Int)
+doSearch grid point = go (S.singleton point)
   where
-    found = S.fromList $ concatMap (explore grid) toSearch
-    newToSearch = S.toList $ S.difference found searched
-    newSearched = S.union searched found
-
-runExplore :: ExploreState -> S.Set (V2 Int)
-runExplore state@(MkState searched toSearch grid)
-  | null toSearch = searched
-  | otherwise = runExplore $ stepExplore state
-
-adjacents :: M.Map (V2 Int) Int -> V2 Int -> [Int]
-adjacents grid c = mapMaybe (`M.lookup` grid) $ allAdjacents c
+    go points =
+      let found = S.union points $ S.unions $ S.map (explore' grid) points
+       in if S.size found == S.size points
+            then found
+            else go found
