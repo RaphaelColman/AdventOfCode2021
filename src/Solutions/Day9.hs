@@ -9,7 +9,7 @@ import           Data.List           (sort, unfoldr)
 import qualified Data.Map            as M
 import           Data.Maybe          (mapMaybe)
 import qualified Data.Set            as S
-import           Linear              (R1 (_x), R2 (_y), V2, unit)
+import           Linear              (R1 (_x), R2 (_y), V2 (V2), unit)
 import           Linear.V2           (R1 (_x), R2 (_y), V2)
 import           Text.Trifecta       (CharParsing (anyChar), Parser,
                                       TokenParsing (token), digit, some)
@@ -20,6 +20,8 @@ aoc9 = do
   printSolutions 9 $ MkAoCSolution parseInput part2
 
 type Grid = M.Map (V2 Int) Int
+
+type Point = V2 Int
 
 parseInput :: Parser [Char]
 parseInput = some anyChar
@@ -52,8 +54,8 @@ allDirections = [unit _x, -unit _x, unit _y, -unit _y]
 allAdjacents :: V2 Int -> [V2 Int]
 allAdjacents v = map (v +) allDirections
 
-explore' :: Grid -> V2 Int -> S.Set (V2 Int)
-explore' grid point = S.fromList $ filter higherAdjacent (allAdjacents point)
+explore :: Grid -> V2 Int -> S.Set (V2 Int)
+explore grid point = S.fromList $ filter higherAdjacent (allAdjacents point)
   where
     higherAdjacent adjPoint =
       case M.lookup adjPoint grid of
@@ -61,10 +63,10 @@ explore' grid point = S.fromList $ filter higherAdjacent (allAdjacents point)
         Nothing -> False
 
 doSearch :: Grid -> V2 Int -> S.Set (V2 Int)
-doSearch grid point = go (S.singleton point)
+doSearch grid = S.unions . unfoldr go . S.singleton
   where
     go points =
-      let found = S.union points $ S.unions $ S.map (explore' grid) points
+      let found = S.union points $ S.unions $ S.map (explore grid) points
        in if S.size found == S.size points
-            then found
-            else go found
+            then Nothing
+            else Just (found, found)

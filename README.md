@@ -14,6 +14,7 @@
     - [Day 6](#day-6)
     - [Day 7](#day-7)
     - [Day 8](#day-8)
+    - [Day 9](#day-9)
 
 ### Overview
 This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
@@ -596,3 +597,55 @@ part2 :: [Entry] -> Maybe Integer
 part2 entries = sum <$> traverse tryMappings entries
 ```
 It's really satisying that the solution here is actually quite compact, considering how complicated the problem seemed initially. I'm keeping my fingers crossed that this was a random spike in difficulty, otherwise there's no way I'll be able to keep up from here onwards.
+
+### Day 9
+Not as tricky as yesterday I think. My slowness was all me rather than the difficulty of the puzzle. This one reminded me a little of the [game of life](https://adventofcode.com/2020/day/17) type puzzles from last year, where it's all about keeping track of adjacent points. Part 1 is just finding the 'low points' on the map - the points where all four cardinal neighbours are of a higher value. We define our map as a 'grid'
+```haskell
+type Grid = M.Map (V2 Int) Int
+```
+and can define a fairly straightforward function for getting the low points out of it:
+```haskell
+allDirections :: [V2 Int]
+allDirections = [unit _x, -unit _x, unit _y, -unit _y]
+
+allAdjacents :: V2 Int -> [V2 Int]
+allAdjacents v = map (v +) allDirections
+
+lowPoints :: Grid -> Grid
+lowPoints grid = lowPoints
+  where
+    lowPoints = M.filterWithKey isLowPoint grid
+    isLowPoint coord value =
+      let adjacents = mapMaybe (`M.lookup` grid) $ allAdjacents coord
+       in value < minimum adjacents
+```
+all this does is filter through the grid with the predicate 'isLowPoint', which itself will attempt to look up all the adjacent points the one passed in and return true if the point we're looking at is of a lower value than all of them. `mapMaybe` is like a watered-down `traverse` specifically for Maybes. It will take a list of Maybes and remove all the `Nothing`s. That way, we only get adjacents which are actually in our map.
+
+Once again, my first pass at part 2 was a bit idiotic. I tried defining a 'SearchState' which would keep track of the points you'd already searched and the ones you still have yet to search. I've since rewritten it using Data.Set heavily, which made it a slightly slower, but much easier to read. So to summarise the problem first: we need to find all the 'basins' now, which means taking a low point and searching around it for points that are higher until we can't find any more. What does this sound like? An [anamorphism](https://en.wikipedia.org/wiki/Anamorphism)! We're generating a sequence from a starting seed value until some condition is met.
+
+My first go at this used explicit recursion, but for this we're going to use the anamorphism for lists: `unfoldr`! The type definition is this:
+```haskell
+unfoldr :: (b -> Maybe (a, b)) -> b -> [a]
+```
+So we give unfoldr a function which returns a Maybe of a tuple, and a starting value. The tuple itself contains whatever we want to put in the list, and a new starting value. We return a `Nothing` if we want the unfold to stop.
+```haskell
+explore :: Grid -> V2 Int -> S.Set (V2 Int)
+explore grid point = S.fromList $ filter higherAdjacent (allAdjacents point)
+  where
+    higherAdjacent adjPoint =
+      case M.lookup adjPoint grid of
+        Just p  -> p > grid M.! point && p /= 9
+        Nothing -> False
+
+doSearch :: Grid -> V2 Int -> S.Set (V2 Int)
+doSearch grid = S.unions . unfoldr go . S.singleton
+  where
+    go points =
+      let found = S.union points $ S.unions $ S.map (explore' grid) points
+       in if S.size found == S.size points
+            then Nothing
+            else Just (found, found)
+```
+So let's unpack this. `explore` is a helper function which, given a grid and a coordinate, will find all adjacent points which are higher up and return them as a set. Then `doSearch` will use unfoldr to explore the new points added to the set. So in this case, the `found` function is just all the points we found from exploring unioned together with our starting points. If we attempt a search and our search space doesn't get any bigger, then we return a `Nothing` so the unfold will stop.
+
+This is certainly fast enough for us, but it's worth noting that it does a lot of unecessary work - it searches all points in the search space every time rather than just the new ones. It's easier to read because it doesn't bother keeping track of what we've already searched. If you wanted to make it faster, you could keep a lazy map of point -> adjacents, but fortunately the basins are not that big so there's no need.
