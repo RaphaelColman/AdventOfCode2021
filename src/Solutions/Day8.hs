@@ -53,9 +53,9 @@ decodeCombos mapping = traverse (decodeCombo mapping)
        in M.lookup mapped knownCombos
 
 allMappings :: [Mapping]
-allMappings = map (curry toMapping "abcdefg") (permutations "abcdefg")
+allMappings = map (toMapping "abcdefg") (permutations "abcdefg")
   where
-    toMapping (str1, str2) = M.fromList $ zip str1 str2
+    toMapping str1 str2 = M.fromList $ zip str1 str2
 
 knownCombos :: M.Map Combo Integer
 knownCombos = M.fromList $ zip combos [0 .. 9]

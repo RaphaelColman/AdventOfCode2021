@@ -59,7 +59,7 @@ initReadState input = MkReadState 0 $ map S.fromList input
 
 stepReadState :: ([BinaryDigit] -> BinaryDigit) -> ReadState -> Maybe ReadState
 stepReadState f (MkReadState index values) = do
-  foundDigit <- f <$> mapM (S.lookup index) values
+  foundDigit <- f <$> traverse (S.lookup index) values
   filtered <- filterM (fmap (== foundDigit) . S.lookup index) values
   pure $ MkReadState (index + 1) filtered
 
