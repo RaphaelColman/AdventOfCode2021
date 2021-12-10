@@ -6,6 +6,7 @@ import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions, printTestSolutions)
 import           Data.Foldable       (Foldable (foldl'))
 import           Data.List           (sort)
+import qualified Data.Map            as M
 import           Data.Maybe          (isNothing, mapMaybe)
 import           Text.Trifecta       (CharParsing (anyChar), Err (_expected),
                                       Parser, some)
@@ -53,32 +54,16 @@ checkLine = foldl' foldFun (MkCS [] Nothing)
       | otherwise = MkCS xs $ Just char
 
 matchBracket :: Char -> Char
-matchBracket c =
-  case c of
-    '{' -> '}'
-    '[' -> ']'
-    '<' -> '>'
-    '(' -> ')'
-    _   -> error $ "unexpected char: " ++ show c
+matchBracket c = M.fromList (zip "{[<(" "}]>)") M.! c
 
 isOpeningBracket :: Char -> Bool
-isOpeningBracket c = c `elem` ['{', '[', '<', '(']
+isOpeningBracket c = c `elem` "{[<("
 
 getErrorScore :: Char -> Integer
-getErrorScore c
-  | c == ')' = 3
-  | c == ']' = 57
-  | c == '}' = 1197
-  | c == '>' = 25137
-  | otherwise = error $ "unexpected char: " ++ show c
+getErrorScore c = M.fromList (zip ")]}>" [3, 57, 1197, 25137]) M.! c
 
 getCompletionScore :: Char -> Integer
-getCompletionScore c
-  | c == ')' = 1
-  | c == ']' = 2
-  | c == '}' = 3
-  | c == '>' = 4
-  | otherwise = error $ "unexpected char: " ++ show c
+getCompletionScore c = M.fromList (zip ")]}>" [1, 2, 3, 4]) M.! c
 
 totalCompletionScore :: String -> Integer
 totalCompletionScore = foldl' f 0
