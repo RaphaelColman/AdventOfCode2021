@@ -15,6 +15,7 @@
     - [Day 7](#day-7)
     - [Day 8](#day-8)
     - [Day 9](#day-9)
+    - [Day 10](#day-10)
 
 ### Overview
 This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
@@ -649,3 +650,44 @@ doSearch grid = S.unions . unfoldr go . S.singleton
 So let's unpack this. `explore` is a helper function which, given a grid and a coordinate, will find all adjacent points which are higher up and return them as a set. Then `doSearch` will use unfoldr to explore the new points added to the set. So in this case, the `found` function is just all the points we found from exploring unioned together with our starting points. If we attempt a search and our search space doesn't get any bigger, then we return a `Nothing` so the unfold will stop.
 
 This is certainly fast enough for us, but it's worth noting that it does a lot of unecessary work - it searches all points in the search space every time rather than just the new ones. It's easier to read because it doesn't bother keeping track of what we've already searched. If you wanted to make it faster, you could keep a lazy map of point -> adjacents, but fortunately the basins are not that big so there's no need.
+
+### Day 10
+I enjoyed today's puzzle. It wasn't all that difficult, but still satisfying to complete. The algorithm is fairly simple. In order to parse something like:
+```
+{([(<{}[<>[]}>{[]{[(<()>
+```
+and conclude that we got a ']' when we should have had a '}', we go through character-by-character from left to right, keeping track of all the expected closing brackets. If our current character equals the most recent expected closing bracket, then we remove it from the list. If our character is itself an opening bracket then we add its closing bracket to the list. Otherwise, we've got an error, and we stop (keeping hold of the bad character). First off, some useful helper functions:
+```haskell
+matchBracket :: Char -> Char
+matchBracket c = M.fromList (zip "{[<(" "}]>)") M.! c
+
+isOpeningBracket :: Char -> Bool
+isOpeningBracket c = c `elem` "{[<("
+```
+We were always going to need these! On to the problem. This is _kind of_ a [catamorphism](https://en.wikipedia.org/wiki/Catamorphism), except it can fail, preserving the reason for failure at the point it happens. Haskell (and FP in general) has the perfect type for this: the [Either](https://hackage.haskell.org/package/base-4.16.0.0/docs/Data-Either.html). Here is how it's defined:
+```haskell
+data  Either a b  =  Left a | Right b
+```
+It's a very simple datatype, and it's commonly used to represent computations that can fail, where if it's a left then it's a failure and if it's a right then it's a success. The reason for that is the way that it's implemented as a functor:
+```haskell
+instance Functor (Either a) where
+    fmap _ (Left x) = Left x
+    fmap f (Right y) = Right (f y)
+```
+So if you map over a Right, you'll map the value inside. If it's a left, then you won't do anything. The applicative and monad instances of the Either have the same philosphy: a left is failure, so do nothing. We can use it to solve our puzzle by defining a function which returns a `Either Char [Char]`. That means if it's a left, it's a single character (the one we failed on), and if it's a right, it's a list of closing brackets we expect. My solution looked like this in the end:
+```haskell
+checkLine :: String -> Either Char [Char]
+checkLine = foldlM go []
+  where go [] currentChar = Right [matchBracket currentChar]
+        go xs@(expected:rest) currentChar
+          | currentChar == expected = Right rest
+          | isOpeningBracket currentChar = Right $ matchBracket currentChar : xs
+          | otherwise = Left currentChar
+```
+We use foldlM, which is like foldl except you can use a function which returns a monad (in our case, an `Either`)
+```haskell
+foldlM :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m b
+```
+foldlM will fold through the foldable, and it will sequence the monad (the either) for each value. The only other thing to note here is that I end up adding the new expected closing brackets to the _left_ of the list. That way, it's easy to pop the most recent one off with pattern matching, and by sheer dumb luck, it's in the correct order for part 2!
+
+Busy weekend coming up, so these write-ups might fall behind. Well actually the puzzles will be getting harder, so they'll probably fall behind regardless of how busy I am.
