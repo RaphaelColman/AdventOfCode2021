@@ -4,7 +4,8 @@ module Solutions.Day10
 
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions, printTestSolutions)
-import           Data.Foldable       (Foldable (foldl'))
+import           Data.Either         (lefts, rights)
+import           Data.Foldable       (Foldable (foldl'), foldlM)
 import           Data.List           (sort)
 import qualified Data.Map            as M
 import           Data.Maybe          (isNothing, mapMaybe)
@@ -16,42 +17,27 @@ aoc10 = do
   printSolutions 10 $ MkAoCSolution parseInput part1
   printSolutions 10 $ MkAoCSolution parseInput part2
 
-data CheckState =
-  MkCS
-    { _expecting :: [Char]
-    , _error     :: Maybe Char
-    }
-  deriving (Eq, Show)
-
 parseInput :: Parser [String]
 parseInput = do
   all <- some anyChar
   pure $ lines all
 
 part1 :: [String] -> Integer
-part1 lns = sum $ map getErrorScore errors
-  where
-    errors = mapMaybe (_error . checkLine) lns
+part1 = sum . map getErrorScore . lefts . map checkLine
 
 part2 :: [String] -> Integer
 part2 lns = sort completionScores !! (length completionScores `div` 2)
   where
-    remaining = filter (isNothing . _error . checkLine) lns
-    completionScores =
-      map (totalCompletionScore . _expecting . checkLine) remaining
+    remaining = rights $ map checkLine lns
+    completionScores = map totalCompletionScore remaining
 
-checkLine :: String -> CheckState
-checkLine = foldl' foldFun (MkCS [] Nothing)
-  where
-    foldFun :: CheckState -> Char -> CheckState
-    foldFun cs@(MkCS _ (Just error)) _ = cs
-    foldFun cs@(MkCS [] _) char =
-      let matched = matchBracket char
-       in MkCS [matched] Nothing
-    foldFun cs@(MkCS xs@(current:rest) _) char
-      | char == current = MkCS rest Nothing
-      | isOpeningBracket char = MkCS (matchBracket char : xs) Nothing
-      | otherwise = MkCS xs $ Just char
+checkLine :: String -> Either Char [Char]
+checkLine = foldlM go []
+  where go [] currentChar = Right [matchBracket currentChar]
+        go xs@(expected:rest) currentChar
+          | currentChar == expected = Right rest
+          | isOpeningBracket currentChar = Right $ matchBracket currentChar : xs
+          | otherwise = Left currentChar
 
 matchBracket :: Char -> Char
 matchBracket c = M.fromList (zip "{[<(" "}]>)") M.! c
