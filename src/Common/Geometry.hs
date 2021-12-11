@@ -3,10 +3,16 @@ module Common.Geometry where
 import           Control.Lens    ((^.))
 import           Data.Foldable   (maximumBy, minimumBy)
 import           Data.List.Split (chunksOf)
-import qualified Data.Map        as M
+import qualified Data.Map        as M hiding (mapMaybe)
+import           Data.Maybe      (mapMaybe)
 import           Data.Sequence   (Seq)
 import qualified Data.Sequence   as Seq
+import qualified Data.Set        as S
 import           Linear.V2       (R1 (_x), R2 (_y), V2 (..))
+
+type Point = V2 Int
+
+type Grid a = M.Map Point a
 
 enumerateMultilineString :: String -> [((Int, Int), Char)]
 enumerateMultilineString str
@@ -22,6 +28,15 @@ enumerateMultilineString str
 enumerateMultilineStringToVectorMap :: String -> M.Map (V2 Int) Char
 enumerateMultilineStringToVectorMap =
   M.fromList . map (\((x, y), c) -> (V2 x y, c)) . enumerateMultilineString
+
+gridNeighbours :: Grid a -> Point -> M.Map Point a
+gridNeighbours grid point = M.restrictKeys grid $ neighbours point
+
+neighbours :: Point -> S.Set Point
+neighbours point = S.fromList $ map (+ point) directions
+  where
+    directions = [V2 x y | x <- units, y <- units, [x, y] /= [0, 0]]
+    units = [-1, 0, 1]
 
 renderVectorMap :: M.Map (V2 Int) Char -> String
 renderVectorMap m =
@@ -42,3 +57,8 @@ renderVectorMap m =
       ]
     panelRows = chunksOf xRange panelList
     rendered = unlines (replicate xRange '=' : panelRows)
+
+renderVectorSet :: S.Set Point -> String
+renderVectorSet points =
+  let asMap = M.fromSet (const 'x') points
+   in undefined

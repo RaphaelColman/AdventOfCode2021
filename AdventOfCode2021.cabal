@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       Common.AoCSolutions
+      Common.Debugging
       Common.EnumUtils
       Common.FileUtils
       Common.FunctorUtils
