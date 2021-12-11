@@ -67,11 +67,7 @@ runFlash octopodes = go $ MkFT S.empty (flashing octopodes) octopodes
           freqs . concatMap (M.keys . gridNeighbours octopodes') $ flashes
         grown = M.unionWith (+) freqMap octopodes'
         newAlreadyFlashed = S.union alreadyFlashed flashes
-        newFlashes =
-          M.keysSet $
-          M.filterWithKey
-            (\k a -> a > 9 && S.notMember k newAlreadyFlashed)
-            grown
+        newFlashes = S.difference (flashing grown) newAlreadyFlashed
 
 convertForRender :: Octopodes -> M.Map Point Char
 convertForRender = M.map (head . show)

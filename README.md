@@ -756,11 +756,7 @@ runFlash octopodes = go $ MkFT S.empty (flashing octopodes) octopodes
           freqs . concatMap (M.keys . gridNeighbours octopodes') $ flashes
         grown = M.unionWith (+) freqMap octopodes'
         newAlreadyFlashed = S.union alreadyFlashed flashes
-        newFlashes =
-          M.keysSet $
-          M.filterWithKey
-            (\k a -> a > 9 && S.notMember k newAlreadyFlashed)
-            grown
+        newFlashes = S.difference (flashing grown) newAlreadyFlashed
 ```
 I can at least break this down. There's a Haskell custom to name your explicitly recursive function `go`. That allows you to make the outer function take simple parameters, then create the extra state-tracking parameters in the body of the outer function. In this case, we're making a starter `FlashTracker` where the set that tracks which octopodes have already flashed is empty.
 
