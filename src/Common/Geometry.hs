@@ -61,4 +61,4 @@ renderVectorMap m =
 renderVectorSet :: S.Set Point -> String
 renderVectorSet points =
   let asMap = M.fromSet (const 'x') points
-   in undefined
+   in renderVectorMap asMap

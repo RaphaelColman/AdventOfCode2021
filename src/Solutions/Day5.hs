@@ -3,6 +3,7 @@ module Solutions.Day5 where
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions, printTestSolutions)
 import           Common.ListUtils    (freqs)
+import           Common.Predicates   (anyPred)
 import           Control.Lens        ((^.))
 import           Data.List           (groupBy)
 import qualified Data.Map            as M
@@ -33,7 +34,7 @@ parseLine = do
 
 part1 :: [Line] -> Int
 part1 lines =
-  let orthogonals = filter (\l -> isHorizontal l || isVertical l) lines
+  let orthogonals = filter (anyPred [isHorizontal, isVertical]) lines
    in M.size $ M.filter (>= 2) $ freqs $ concatMap pointsCovered orthogonals
 
 part2 :: [Line] -> Int

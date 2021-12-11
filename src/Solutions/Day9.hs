@@ -5,6 +5,7 @@ module Solutions.Day9
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions, printTestSolutions)
 import           Common.Geometry     (enumerateMultilineStringToVectorMap)
+import           Common.Predicates   (allPred)
 import           Data.List           (sort, unfoldr)
 import qualified Data.Map            as M
 import           Data.Maybe          (mapMaybe)
@@ -59,7 +60,7 @@ explore grid point = S.fromList $ filter higherAdjacent (allAdjacents point)
   where
     higherAdjacent adjPoint =
       case M.lookup adjPoint grid of
-        Just p  -> p > grid M.! point && p /= 9
+        Just p  -> allPred [(> grid M.! point), (/= 9)] p
         Nothing -> False
 
 doSearch :: Grid -> V2 Int -> S.Set (V2 Int)

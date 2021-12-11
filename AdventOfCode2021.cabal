@@ -34,6 +34,7 @@ library
       Common.ListUtils
       Common.MapUtils
       Common.MaybeUtils
+      Common.Predicates
       Lib
       Solutions.Day1
       Solutions.Day10
