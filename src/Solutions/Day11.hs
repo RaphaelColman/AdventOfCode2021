@@ -10,6 +10,8 @@ import           Common.Geometry     (Grid, Point,
                                       gridNeighbours, renderVectorMap,
                                       renderVectorSet)
 import           Common.ListUtils    (freqs)
+import           Common.MapUtils     (mapIf)
+import qualified Common.MapUtils     as M
 import           Data.List           (findIndex)
 import qualified Data.Map.Strict     as M
 import qualified Data.Set            as S
@@ -27,7 +29,7 @@ type FreqMap = M.Map Point Integer
 data FlashTracker =
   MkFT
     { _alreadFlashed :: S.Set Point
-    , _newFlashes    :: S.Set Point
+    , _flashes       :: S.Set Point
     , _octopodes     :: Octopodes
     }
   deriving (Eq, Show)
@@ -39,16 +41,10 @@ parseInput = do
   pure $ M.map (\c -> read [c]) charMap
 
 part1 :: Octopodes -> Int
-part1 = sum . map countZero . take 101 . iterate step
+part1 = sum . map (length . M.filter (== 0)) . take 101 . iterate step
 
 part2 :: Octopodes -> Maybe Int
-part2 = findIndex allZero . iterate step
-
-countZero :: Octopodes -> Int
-countZero = length . M.filter (== 0)
-
-allZero :: Octopodes -> Bool
-allZero = all (== 0) . M.elems
+part2 = findIndex (all (== 0) . M.elems) . iterate step
 
 flashing :: Octopodes -> S.Set Point
 flashing = M.keysSet . M.filter (> 9)
@@ -57,30 +53,25 @@ grow :: Octopodes -> Octopodes
 grow = M.map (+ 1)
 
 step :: Octopodes -> Octopodes
-step octopodes =
-  M.map
-    (\a ->
-       if a > 9
-         then 0
-         else a)
-    flashed
-  where
-    flashed = runFlash $ grow octopodes
+step = mapIf (> 9) (const 0) . runFlash . grow
 
 runFlash :: Octopodes -> Octopodes
 runFlash octopodes = go $ MkFT S.empty (flashing octopodes) octopodes
   where
     go :: FlashTracker -> Octopodes
-    go ft@(MkFT alreadyFlashed newFlashes octopodes')
-      | null newFlashes = grown
-      | otherwise = go (MkFT newAlreadyFlashed newNewFlashes grown)
+    go ft@(MkFT alreadyFlashed flashes octopodes')
+      | null flashes = grown
+      | otherwise = go (MkFT newAlreadyFlashed newFlashes grown)
       where
         freqMap =
-          freqs . concatMap (M.keys . gridNeighbours octopodes') $ newFlashes
+          freqs . concatMap (M.keys . gridNeighbours octopodes') $ flashes
         grown = M.unionWith (+) freqMap octopodes'
-        newAlreadyFlashed = S.union alreadyFlashed newFlashes
-        newNewFlashes =
+        newAlreadyFlashed = S.union alreadyFlashed flashes
+        newFlashes =
           M.keysSet $
           M.filterWithKey
             (\k a -> a > 9 && S.notMember k newAlreadyFlashed)
             grown
+
+convertForRender :: Octopodes -> M.Map Point Char
+convertForRender = M.map (head . show)

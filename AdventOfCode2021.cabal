@@ -32,6 +32,7 @@ library
       Common.FunctorUtils
       Common.Geometry
       Common.ListUtils
+      Common.MapUtils
       Common.MaybeUtils
       Lib
       Solutions.Day1

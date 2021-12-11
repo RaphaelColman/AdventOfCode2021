@@ -16,6 +16,7 @@
     - [Day 8](#day-8)
     - [Day 9](#day-9)
     - [Day 10](#day-10)
+    - [Day 11](#day-11)
 
 ### Overview
 This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
@@ -691,3 +692,108 @@ foldlM :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m b
 foldlM will fold through the foldable, and it will sequence the monad (the either) for each value. The only other thing to note here is that I end up adding the new expected closing brackets to the _left_ of the list. That way, it's easy to pop the most recent one off with pattern matching, and by sheer dumb luck, it's in the correct order for part 2!
 
 Busy weekend coming up, so these write-ups might fall behind. Well actually the puzzles will be getting harder, so they'll probably fall behind regardless of how busy I am.
+
+### Day 11
+I got myself into an absolute mess with this one! It has been my absolute worst puzzle so far. I now think it's not that hard, but I kept confusing myself, and ending up with infinite loops and broken code. For starters, I thought flashes would happen at energy >= 9, not energy > 9, which was pretty bad. Then I tied myself in knots trying to find a neat way of figuring out if all the flashes were finished this step and we could progress to the next one. After that, I named a bunch of things lazily (`runFlash`,`runFlash2` etc) and got really confused that way. Disaster!
+
+On the flip side, I solved a problem that bugged me a lot last year. Haskell Base ships with a module called `Debug.Trace` which allows you to print things to the console even in functions which are not IO functions. It's super useful. However, for AoC sometimes you really need to just print out the 2d picture of what's going on, and `Debug.Trace` won't let you do that because it shows newline characters as `\n`, not as actual new lines. I ended up writing my own trace method which uses `unsafePerformIO` to allow me to render grids properly (I needed it because I'd written such stupid buggy code!)
+
+So as ever, we start with some [modelling](https://media.giphy.com/media/Sv951Hh0D7bCK6C3bX/giphy.gif):
+
+```haskell
+type Octopodes = Grid Integer
+
+type FreqMap = M.Map Point Integer
+
+data FlashTracker =
+  MkFT
+    { _alreadFlashed :: S.Set Point
+    , _flashes       :: S.Set Point
+    , _octopodes     :: Octopodes
+    }
+  deriving (Eq, Show)
+```
+`Point` and `Grid` are some types I created in my `Common.Geometry` package which are coordinates and maps of coordinates respectively.  I decided to call the grid of octopus energy levels an `Octopodes` because, as a friend of mine keeps insisting, the plural of octopus should be 'octopodes' because its roots are in Greek, not Latin.
+It took me ages to bite the bullet and write the `FlashTracker`. Amazing how easy it became once I admitted I needed a simple type to keep track of state. The idea is that we keep track of which octopodes have already flashed during a step so we only evaluate the new ones and don't end up in an infinite loop.
+
+In order to solve this kind of problem it helps to just bash out some of the helper functions we _know_ we're going to need no matter what:
+```haskell
+flashing :: Octopodes -> S.Set Point
+flashing = M.keysSet . M.filter (> 9)
+
+grow :: Octopodes -> Octopodes
+grow = M.map (+ 1)
+
+---I put these in Common.Geometry because they'll definitely be useful in the future
+--Get all the neighbours for a point in all directions including diagonals
+neighbours :: Point -> S.Set Point
+neighbours point = S.fromList $ map (+ point) directions
+  where
+    directions = [V2 x y | x <- units, y <- units, [x, y] /= [0, 0]]
+    units = [-1, 0, 1]
+
+--Get all the neighbours for a point which are in a specified grid
+gridNeighbours :: Grid a -> Point -> M.Map Point a
+gridNeighbours grid point = M.restrictKeys grid $ neighbours point
+
+
+--This one is in Common.ListUtils. Given a list, it will count how many times each item appears in a list and make a frequency map
+freqs :: (Ord k, Num a) => [k] -> M.Map k a
+freqs xs = M.fromListWith (+) (map (, 1) xs)
+```
+
+So the important bit is evaluating flashing octopodes during a step. We'll need a recursive function which keeps growing the energy of adjacent octopodes based on how many flashes they are near. Prepare yourself! This one is a bit ugly:
+```haskell
+runFlash :: Octopodes -> Octopodes
+runFlash octopodes = go $ MkFT S.empty (flashing octopodes) octopodes
+  where
+    go :: FlashTracker -> Octopodes
+    go ft@(MkFT alreadyFlashed flashes octopodes')
+      | null flashes = grown
+      | otherwise = go (MkFT newAlreadyFlashed newFlashes grown)
+      where
+        freqMap =
+          freqs . concatMap (M.keys . gridNeighbours octopodes') $ flashes
+        grown = M.unionWith (+) freqMap octopodes'
+        newAlreadyFlashed = S.union alreadyFlashed flashes
+        newFlashes =
+          M.keysSet $
+          M.filterWithKey
+            (\k a -> a > 9 && S.notMember k newAlreadyFlashed)
+            grown
+```
+I can at least break this down. There's a Haskell custom to name your explicitly recursive function `go`. That allows you to make the outer function take simple parameters, then create the extra state-tracking parameters in the body of the outer function. In this case, we're making a starter `FlashTracker` where the set that tracks which octopodes have already flashed is empty.
+
+Then we make a map of Point -> number of flashing octopodes (called `freqMap`). It reads a bit like minesweeper:
+```
+.1...112.1
+11...1.211
+.....111..
+.....11111
+.....1.11.
+...1121122
+...1.1..1.
+...111..11
+```
+So in this case: most of the points are near 1 flashing octopus, and some are near 2.
+After that, increment each of those by the number they are next to:
+```haskell
+grown = M.unionWith (+) freqMap octopodes'
+```
+Finally, we use `S.union` to add to our set of already flashed octopodes, and generate a set of new flashes by seeing who's got a high enough energy and is not in our set. We can then recurse until `newFlashes` is empty.
+
+Now we have our recursive `runFlash` function, defining a step is actually pretty easy. I'm using a `mapIf` helper function I defined which takes a predicate and only maps the value in the map if the predicate is met. So here we'll reset octopodes that have an energy of above 9 back to 0
+```haskell
+step :: Octopodes -> Octopodes
+step = mapIf (> 9) (const 0) . runFlash . grow
+```
+
+After that it's pretty simple to count the number of 0s in each step for part 1, and run until we get a synchronized flash for part 2.
+```haskell
+part1 :: Octopodes -> Int
+part1 = sum . map (length . M.filter (== 0)) . take 101 . iterate step
+
+part2 :: Octopodes -> Maybe Int
+part2 = findIndex (all (== 0) . M.elems) . iterate step
+```
+Fingers crossed I find tomorrow easier!
