@@ -6,7 +6,6 @@ import           Common.FunctorUtils (fmap2)
 import qualified Data.Map            as M
 import qualified Data.Set            as S
 import           Data.Tuple          (swap)
-import           Debug.Trace
 import           GHC.Unicode         (isLower, isUpper)
 import           Text.Trifecta       (CharParsing (char), Parser,
                                       TokenParsing (token), letter, newline,
@@ -35,12 +34,10 @@ parseInput =
     pure (startCave, endCave)
 
 part1 :: [Connection] -> Int
-part1 paths = length $ findPaths caveSystem
-  where
-    caveSystem = initCaveSystem paths
+part1 = length . flip findPaths False . initCaveSystem
 
 part2 :: [Connection] -> Int
-part2 = length . findPaths2 . initCaveSystem
+part2 = length . flip findPaths True . initCaveSystem
 
 initCaveSystem :: [Connection] -> CaveSystem
 initCaveSystem paths = M.fromListWith (++) withReversed
@@ -50,54 +47,19 @@ initCaveSystem paths = M.fromListWith (++) withReversed
 bigCave :: Cave -> Bool
 bigCave = all isUpper
 
-smallCave :: Cave -> Bool
-smallCave = all isLower
-
-findPaths :: CaveSystem -> [Path]
-findPaths system = go S.empty "start"
+findPaths :: CaveSystem -> Bool -> [Path]
+findPaths system allowSecondVisit = go S.empty (not allowSecondVisit) "start"
   where
-    go :: S.Set Cave -> Cave -> [Path]
-    go visited "end" = [["end"]]
-    go visited cave = added
-      where
-        children = system M.! cave
-        validChildren =
-          filter
-            (\child -> bigCave child || not (child `S.member` visited))
-            children
-        childPaths = concatMap (go (S.insert cave visited)) validChildren
-        added = map (cave :) childPaths
-
-findPaths2 :: CaveSystem -> [Path]
-findPaths2 system = go S.empty Nothing "start"
-  where
-    go :: S.Set Cave -> Maybe Cave -> Cave -> [Path]
     go visited visitedTwice "end" = [["end"]]
-    go visited visitedTwice cave = added
+    go visited visitedTwice cave =
+      map (cave :) $ concatMap visitChild $ system M.! cave
       where
-        children = system M.! cave
-        validChildren =
-          filter fst3 $ map (isValidChild visited visitedTwice) children
-        childPaths =
-          concatMap
-            (\(b, vt, ch) -> go (S.insert cave visited) vt ch)
-            validChildren
-        added = map (cave :) childPaths
-
-isValidChild :: S.Set Cave -> Maybe Cave -> Cave -> (Bool, Maybe Cave, Cave)
-isValidChild visited visitedTwice child
-  | bigCave child = (True, visitedTwice, child)
-  | child == "end" = (not alreadySeen, visitedTwice, child)
-  | child == "start" = (not alreadySeen, visitedTwice, child)
-  | otherwise =
-    case visitedTwice of
-      Just cv -> (not alreadySeen, Just cv, child)
-      Nothing ->
-        if alreadySeen
-          then (True, Just child, child)
-          else (True, Nothing, child)
-  where
-    alreadySeen = child `S.member` visited
-
-fst3 :: (a, b, c) -> a
-fst3 (x, _, _) = x
+        visitChild child
+          | child == "start" = []
+          | bigCave child = go updateVisited visitedTwice child
+          | child `S.member` visited =
+            if visitedTwice
+              then []
+              else go updateVisited True child
+          | otherwise = go updateVisited visitedTwice child
+        updateVisited = S.insert cave visited
