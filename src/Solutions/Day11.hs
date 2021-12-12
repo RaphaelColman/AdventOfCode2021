@@ -11,7 +11,6 @@ import           Common.Geometry     (Grid, Point,
                                       renderVectorSet)
 import           Common.ListUtils    (freqs)
 import           Common.MapUtils     (mapIf)
-import qualified Common.MapUtils     as M
 import           Data.List           (findIndex)
 import qualified Data.Map.Strict     as M
 import qualified Data.Set            as S
