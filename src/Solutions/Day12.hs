@@ -1,8 +1,10 @@
 module Solutions.Day12 where
 
+import           Combinatorics       (tuples)
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions, printTestSolutions)
 import           Common.FunctorUtils (fmap2)
+import           Control.Applicative (Alternative (some), liftA3)
 import qualified Data.Map            as M
 import qualified Data.Set            as S
 import           Data.Tuple          (swap)
@@ -63,3 +65,41 @@ findPaths system allowSecondVisit = go S.empty (not allowSecondVisit) "start"
               else go updateVisited True child
           | otherwise = go updateVisited visitedTwice child
         updateVisited = S.insert cave visited
+
+findPathsKnots :: CaveSystem -> Bool -> [Path]
+findPathsKnots system allowSecondVisit =
+  memo M.! MkMemoKey "start" S.empty (not allowSecondVisit)
+  where
+    memo = M.fromList $ map go allMemoKeys
+    allPossibleVisited = allSets $ M.keys system
+    allMemoKeys =
+      liftA3 MkMemoKey (M.keys system) allPossibleVisited [True, False]
+    go mk@(MkMemoKey "end" _ _) = (mk, [["end"]])
+    go mk@(MkMemoKey cave visited visitedTwice) =
+      let paths = map (cave :) $ concatMap visitChild $ system M.! cave
+       in (mk, paths)
+      where
+        visitChild child
+          | child == "start" = []
+          | bigCave child = lookupForChild child visitedTwice
+          | child `S.member` visited =
+            if visitedTwice
+              then []
+              else lookupForChild child True
+          | otherwise = lookupForChild child visitedTwice
+        lookupForChild child visitedTwice' =
+          memo M.! MkMemoKey child (S.insert cave visited) visitedTwice'
+
+allSets :: (Ord a) => [a] -> [S.Set a]
+allSets xs = gen
+  where
+    sizes = [0 .. length xs]
+    gen = map S.fromList $ concatMap (`tuples` xs) sizes
+
+data MemoKey =
+  MkMemoKey
+    { cave         :: Cave
+    , visited      :: S.Set Cave
+    , visitedTwice :: Bool
+    }
+  deriving (Eq, Show, Ord)
