@@ -5,15 +5,16 @@ module Solutions.Day13
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions, printTestSolutions)
 import           Common.Debugging    (traceLns, traceVectorMap)
-import           Common.Geometry     (Point, renderVectorList, Grid)
-import           Control.Lens        ((^.))
-import           Data.List           (partition, sort, foldl')
+import           Common.Geometry     (Grid, Point, renderVectorList,
+                                      renderVectorSet)
+import           Control.Lens        ((^.), (.~))
+import           Data.List           (foldl', partition, sort)
 import qualified Data.Map            as M
 import           Data.Maybe          (fromJust)
 import           Data.Sequence       as Seq (fromList, (!?))
 import qualified Data.Set            as S
 import           Debug.Trace
-import           Linear.V2
+import Linear.V2 ( V2(..), R1(_x), R2(_y) )
 import           Text.Trifecta       (CharParsing (anyChar, char, string),
                                       Parser, TokenParsing (token), commaSep,
                                       integer, letter, some, whiteSpace)
@@ -24,13 +25,13 @@ aoc13 = do
   printSolutions 13 $ MkAoCSolution parseInput part2
 
 data Fold
-  = Horizontal Int
-  | Vertical Int
+  = YFold Int
+  | XFold Int
   deriving (Eq, Show, Ord)
 
 data Paper =
   MkPaper
-    { _points :: [Point]
+    { _points :: S.Set Point
     , _folds  :: [Fold]
     }
   deriving (Eq, Show)
@@ -40,7 +41,7 @@ parseInput = do
   points <- parsePoints
   whiteSpace
   folds <- some parseFold
-  pure $ MkPaper points folds
+  pure $ MkPaper (S.fromList points) folds
 
 parseFold :: Parser Fold
 parseFold = do
@@ -49,8 +50,8 @@ parseFold = do
   char '='
   value <- fromInteger <$> integer
   case l of
-    'y' -> pure $ Horizontal value
-    'x' -> pure $ Vertical value
+    'y' -> pure $ YFold value
+    'x' -> pure $ XFold value
     _   -> fail $ "Unexpected character" ++ [l]
 
 parsePoints :: Parser [Point]
@@ -63,40 +64,38 @@ parsePoints = do
 part1 :: Paper -> Int
 part1 (MkPaper points folds) = length $ applyFold (head folds) points
 
-part2 :: Paper -> [Point]
-part2 (MkPaper points folds) = traceLns (renderVectorList done) done
-  where done = foldl' (flip applyFold) points folds
-
-applyFold :: Fold -> [Point] -> [Point]
-applyFold fold points = case fold of
-  Horizontal n -> foldAlongHorizontal n points
-  Vertical n -> foldAlongVertical n points
-
-
-foldAlongHorizontal :: Int -> [Point] -> [Point]
-foldAlongHorizontal val points = S.toList merged
+part2 :: Paper -> S.Set Point
+part2 (MkPaper points folds) = traceLns (renderVectorSet done) done
   where
-    withoutLine = filter (\(V2 _ y) -> y /= val) points
-    (below, above) = partition (\(V2 _ y) -> y > val) withoutLine
-    foldedBottom = flipVertical (val * 2) below
-    merged = S.union (S.fromList foldedBottom) (S.fromList above)
+    done = foldl' (flip applyFold) points folds
 
-foldAlongVertical :: Int -> [Point] -> [Point]
-foldAlongVertical val points = S.toList merged
-  where
-    withoutLine = filter (\(V2 x _) -> x /= val) points
-    (right, left) = partition (\(V2 x _) -> x > val) withoutLine
-    foldedRight = flipHorizontal (val * 2) right
-    merged = S.union (S.fromList foldedRight) (S.fromList left)
+applyFold :: Fold -> S.Set Point -> S.Set Point
+applyFold fold points =
+  case fold of
+    YFold n -> doFold n inY points
+    XFold n -> doFold n inX points
 
-flipVertical :: Int -> [Point] -> [Point]
-flipVertical span = map flipPoint
+doFold :: Int -> Axis -> S.Set Point -> S.Set Point
+doFold val (get', reflectF) points = S.union folded above
   where
-    flipNum num = fromJust $ Seq.fromList [span,span - 1 .. 0] Seq.!? num
-    flipPoint (V2 x y) = V2 x (flipNum y)
+    withoutLine = S.filter (\v -> get' v /= val) points
+    (below, above) = S.partition (\v -> get' v > val) withoutLine
+    folded = S.map (reflectF val) below
 
-flipHorizontal :: Int -> [Point] -> [Point]
-flipHorizontal span = map flipPoint
-  where
-    flipNum num = fromJust $ Seq.fromList [span,span - 1 .. 0] Seq.!? num
-    flipPoint (V2 x y) = V2 (flipNum x) y
+reflectX :: Int -> Point -> Point
+reflectX val (V2 x y) =
+  let amount = val - x
+   in V2 (val + amount) y
+
+reflectY :: Int -> Point -> Point
+reflectY val (V2 x y) =
+  let amount = val - y
+   in V2 x (val + amount)
+
+inX :: (V2 a -> a, Int -> Point -> Point)
+inX = ((^. _x), reflectX)
+
+inY :: (V2 a -> a, Int -> Point -> Point)
+inY = ((^. _y), reflectY)
+
+type Axis = (Point -> Int, Int -> Point -> Point)
