@@ -18,6 +18,7 @@
     - [Day 10](#day-10)
     - [Day 11](#day-11)
     - [Day 12](#day-12)
+    - [Day 13](#day-13)
 
 ### Overview
 This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
@@ -901,3 +902,83 @@ data MemoKey =
 
 ```
 In this one we have a lazy map where the keys are all `MemoKeys` - a combination of current cave, the set of already visited caves and the boolean tracking whether we have performed our second visit. Before you go and try and understand this one fully, I'm going to point out that it's actually _slower_ than the vanilla recursion one. What a disappointment! I traced all the occasions where it looks up a new value in the memo, and made an educated guess that for this input, it very unlikely to make the same exact lookup twice. My conclusion here is that the overhead incurred for comparing all those `MemoKeys` for equality is higher than benefit of memoization. Ah well, it was fun to try!
+
+### Day 13
+I made the mistake today of trying to reuse my code from the ["Jurassic Jigsaw" puzzle last year](https://adventofcode.com/2020/day/20). My code from that puzzle was unreadable spaghetti though, so don't think it saved any time at all. My repo from 2020 is public, so have a look at that day if you want to see some truly horrifying Haskell.
+
+As usual for 2d geometry puzzles, I relied heavily on Linear.V2.
+```haskell
+data Fold
+  = YFold Int
+  | XFold Int
+  deriving (Eq, Show, Ord)
+
+data Paper =
+  MkPaper
+    { _points :: S.Set Point
+    , _folds  :: [Fold]
+    }
+  deriving (Eq, Show)
+```
+Another lesson I learned today - if you think you need a Set then just go ahead and use one. I stubbornly stuck to lists for ages (but that made removing duplicates that little bit more fiddly).
+
+Some simple helper functions to reflect a coordinate around a horizontal or vertical line:
+```haskell
+reflectX :: Int -> Point -> Point
+reflectX val (V2 x y) =
+  let amount = val - x
+   in V2 (val + amount) y
+
+reflectY :: Int -> Point -> Point
+reflectY val (V2 x y) =
+  let amount = val - y
+   in V2 x (val + amount)
+```
+This is not that hard! I don't know why I tried to use my spaghetti mess from last year.
+A function which 'folds' a set of points about a line will look something like this:
+```haskell
+doFoldX :: Int -> S.Set Point -> S.Set Point
+doFoldX val points = S.union folded right
+  where
+    withoutLine = S.filter (\(V2 x y) -> x /= val) points
+    (right, left) = S.partition (\(V2 x y) -> x > val) withoutLine
+    folded = S.map (reflectX val) left
+```
+We remove the points on the line itself. Then we partition the the points on either side of the line. Finally, we reflect the points on one side and union everything back together (which removes duplicates).
+
+We can generalise this for folding over a horizontal or a vertical line like this:
+```haskell
+type Axis = (Point -> Int, Int -> Point -> Point)
+
+inX :: (V2 a -> a, Int -> Point -> Point)
+inX = ((^. _x), reflectX)
+
+inY :: (V2 a -> a, Int -> Point -> Point)
+inY = ((^. _y), reflectY)
+
+doFold :: Int -> Axis -> S.Set Point -> S.Set Point
+doFold val (get', reflectF) points = S.union folded above
+  where
+    withoutLine = S.filter (\v -> get' v /= val) points
+    (below, above) = S.partition (\v -> get' v > val) withoutLine
+    folded = S.map (reflectF val) below
+```
+Not a big leap - we just separate out the functions for getting hold of the x or y field from a V2, and also the function for performing the reflection.
+
+Part 1 and part 2 end up looking like this.
+```haskell
+part1 :: Paper -> Int
+part1 (MkPaper points folds) = length $ applyFold (head folds) points
+
+part2 :: Paper -> S.Set Point
+part2 (MkPaper points folds) = traceLns (renderVectorSet done) done
+  where
+    done = foldl' (flip applyFold) points folds
+
+applyFold :: Fold -> S.Set Point -> S.Set Point
+applyFold fold points =
+  case fold of
+    YFold n -> doFold n inY points
+    XFold n -> doFold n inX points
+```
+I don't know about you, but I find it _really_ pleasing that both parts call the function `foldl` over a `Foldable` full of datatypes called `Fold`.
