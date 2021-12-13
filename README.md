@@ -17,6 +17,7 @@
     - [Day 9](#day-9)
     - [Day 10](#day-10)
     - [Day 11](#day-11)
+    - [Day 12](#day-12)
 
 ### Overview
 This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
@@ -793,3 +794,110 @@ part2 :: Octopodes -> Maybe Int
 part2 = findIndex (all (== 0) . M.elems) . iterate step
 ```
 Fingers crossed I find tomorrow easier!
+
+### Day 12
+A lovely puzzle today! Normally there's some sort of graph-traversal problem at this point in your advent journey, although the most similar ones I can think of from the last two years were directed acyclic graphs, whereas this was just a graph.
+
+Problems like this normally have a memoization solution which involves [recursive knot tying](https://wiki.haskell.org/Tying_the_Knot), which one of my favourite Haskelly mind-bending techniques. My first pass just used vanilla recursion, but read on to the end to hear about the weird and wonderful world of recursive knots.
+
+So the point here is that we need to traverse from node to node until we reach the end-node, and most nodes can only be visited once. Let's get the model down:
+```haskell
+type Cave = String
+
+type Path = [Cave]
+
+type Connection = (Cave, Cave)
+
+type CaveSystem = M.Map Cave [Cave]
+
+bigCave :: Cave -> Bool
+bigCave = all isUpper
+
+initCaveSystem :: [Connection] -> CaveSystem
+initCaveSystem paths = M.fromListWith (++) withReversed
+  where
+    withReversed = fmap2 (: []) $ paths ++ map swap paths
+```
+The CaveSystem is a map of cave to connected caves (or node -> children).
+
+We need to enumerate all possible paths from 'start' to 'end', so our algorithm is going to be recursive. The obvious base case is that we've reached the 'end' cave, in which case we return a list with one path in it `[["end"]]`
+
+In all other cases, we look at all the children for the cave we're on. If we've visited that child before and we're not allowed to (it's not a big cave) then we discard it (return an empty list). In all other cases, we call our recursive method again but for each child (so we get a list of lists which we can concatenate). We then bung our current node onto the start of each list and return that. And voila!
+```haskell
+findPaths' :: CaveSystem -> [Path]
+findPaths' system = go S.empty "start"
+  where
+    go visited "end" = [["end"]]
+    go visited cave = map (cave :) $ concatMap visitChild $ system M.! cave
+      where
+        visitChild child
+          | bigCave child = go updateVisited child
+          | child `S.member` visited = []
+          | otherwise = go updateVisited child
+        updateVisited = S.insert cave visited
+```
+It's my shame as a hot-blooded Haskeller that recursion still makes my head spin.
+
+The solution for part 2 is only a slight change. Now we need to keep track of whether we have performed our one-time-only 'second visit', which we can just track as a boolean. To keep track of state through recursive calls, you simply add a parameter to your recursive function ('go' in this case). The version for part 2 looks like this:
+```haskell
+findPaths :: CaveSystem -> Bool -> [Path]
+findPaths system allowSecondVisit = go S.empty (not allowSecondVisit) "start"
+  where
+    go visited visitedTwice "end" = [["end"]]
+    go visited visitedTwice cave =
+      map (cave :) $ concatMap visitChild $ system M.! cave
+      where
+        visitChild child
+          | child == "start" = []
+          | bigCave child = go updateVisited visitedTwice child
+          | child `S.member` visited =
+            if visitedTwice
+              then []
+              else go updateVisited True child
+          | otherwise = go updateVisited visitedTwice child
+        updateVisited = S.insert cave visited
+```
+Almost exactly the same, except we do some special stuff for if we've visited this node already and it's not a big cave. If we are allowed a second visit still, then we recurse but setting `visitedTwice` to true. Otherwise, we discard that child (return an empty list)
+
+So what about this recursive knot-tying? It's worth reading [this blog post](https://jelv.is/blog/Lazy-Dynamic-Programming/) to get a feel for how it works, but the basic idea is that we want some form of memoization, so that we don't have to calculate the paths for a node more than once. With the function above, we are in danger of calling `go` multiples times for exactly the same parameters, which can be made faster by storing the results from the first call and then just using those for any subsequent ones. The trick to doing it in haskell is defining some lazy data structure where the keys are anything you might want to call `go` with and the values are lazily defined. Then, instead of recursing by calling a method, you recurse by looking up the corresponding value in your data structure (which will probably look up some other value somewhere else etc). The lazy population of your data structure mimics the gradual population of a memo. I tinkered for a while and then came up with this eyesore:
+```haskell
+findPathsKnots :: CaveSystem -> Bool -> [Path]
+findPathsKnots system allowSecondVisit =
+  memo M.! MkMemoKey "start" S.empty (not allowSecondVisit)
+  where
+    memo = M.fromList $ map go allMemoKeys
+    allPossibleVisited = allSets $ M.keys system
+    allMemoKeys =
+      liftA3 MkMemoKey (M.keys system) allPossibleVisited [True, False]
+    go mk@(MkMemoKey "end" _ _) = (mk, [["end"]])
+    go mk@(MkMemoKey cave visited visitedTwice) =
+      let paths = map (cave :) $ concatMap visitChild $ system M.! cave
+       in (mk, paths)
+      where
+        visitChild child
+          | child == "start" = []
+          | bigCave child = lookupForChild child visitedTwice
+          | child `S.member` visited =
+            if visitedTwice
+              then []
+              else lookupForChild child True
+          | otherwise = lookupForChild child visitedTwice
+        lookupForChild child visitedTwice' =
+          memo M.! MkMemoKey child (S.insert cave visited) visitedTwice'
+
+allSets :: (Ord a) => [a] -> [S.Set a]
+allSets xs = gen
+  where
+    sizes = [0 .. length xs]
+    gen = map S.fromList $ concatMap (`tuples` xs) sizes
+
+data MemoKey =
+  MkMemoKey
+    { cave         :: Cave
+    , visited      :: S.Set Cave
+    , visitedTwice :: Bool
+    }
+  deriving (Eq, Show, Ord)
+
+```
+In this one we have a lazy map where the keys are all `MemoKeys` - a combination of current cave, the set of already visited caves and the boolean tracking whether we have performed our second visit. Before you go and try and understand this one fully, I'm going to point out that it's actually _slower_ than the vanilla recursion one. What a disappointment! I traced all the occasions where it looks up a new value in the memo, and made an educated guess that for this input, it very unlikely to make the same exact lookup twice. My conclusion here is that the overhead incurred for comparing all those `MemoKeys` for equality is higher than benefit of memoization. Ah well, it was fun to try!
