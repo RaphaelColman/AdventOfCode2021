@@ -60,5 +60,8 @@ renderVectorMap m =
 
 renderVectorSet :: S.Set Point -> String
 renderVectorSet points =
-  let asMap = M.fromSet (const 'x') points
+  let asMap = M.fromSet (const '#') points
    in renderVectorMap asMap
+
+renderVectorList :: [Point] -> String
+renderVectorList = renderVectorSet . S.fromList 
