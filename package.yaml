@@ -33,6 +33,8 @@ dependencies:
 - linear
 - lens
 - split
+- mtl
+- safe
 
 library:
   source-dirs: src

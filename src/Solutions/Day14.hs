@@ -9,6 +9,7 @@ import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
 import           Common.ListUtils    (freqs, window2)
 import           Data.List           (sort)
 import qualified Data.Map            as M
+import Control.Monad.State
 import           Text.Trifecta       (CharParsing (string), Parser,
                                       TokenParsing (token), count, letter, some,
                                       whiteSpace)

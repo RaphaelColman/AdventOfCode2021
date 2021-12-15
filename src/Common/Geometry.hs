@@ -9,6 +9,7 @@ import           Data.Sequence   (Seq)
 import qualified Data.Sequence   as Seq
 import qualified Data.Set        as S
 import           Linear.V2       (R1 (_x), R2 (_y), V2 (..))
+import Linear (unit)
 
 type Point = V2 Int
 
@@ -65,3 +66,12 @@ renderVectorSet points =
 
 renderVectorList :: [Point] -> String
 renderVectorList = renderVectorSet . S.fromList 
+
+allOrthogonalDirections :: [V2 Int]
+allOrthogonalDirections = [unit _x, -unit _x, unit _y, -unit _y]
+
+allOrthogonalNeighbours :: V2 Int -> S.Set Point
+allOrthogonalNeighbours v = S.fromList $ map (v +) allOrthogonalDirections
+
+gridOrthogonalNeighbours :: Grid a -> Point -> M.Map Point a
+gridOrthogonalNeighbours grid point = M.restrictKeys grid $ allOrthogonalNeighbours point

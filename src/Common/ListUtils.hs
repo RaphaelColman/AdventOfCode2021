@@ -4,6 +4,8 @@ module Common.ListUtils where
 
 import           Data.List (group, sort, tails)
 import qualified Data.Map  as M
+import qualified Data.Set  as S
+import Combinatorics (tuples)
 
 freqs :: (Ord k, Num a) => [k] -> M.Map k a
 freqs xs = M.fromListWith (+) (map (, 1) xs)
@@ -24,3 +26,9 @@ window3 _          = []
 
 windowN :: Int -> [a] -> [[a]]
 windowN n xs = filter ((== n) . length) $ map (take n) $ tails xs
+
+allSets :: (Ord a) => [a] -> [S.Set a]
+allSets xs = gen
+  where
+    sizes = [0 .. length xs]
+    gen = map S.fromList $ concatMap (`tuples` xs) sizes

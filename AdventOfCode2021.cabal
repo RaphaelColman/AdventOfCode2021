@@ -75,6 +75,8 @@ library
     , dotenv
     , lens
     , linear
+    , mtl
+    , safe
     , split
     , text
     , text-format
@@ -99,6 +101,8 @@ executable AdventOfCode2021-exe
     , dotenv
     , lens
     , linear
+    , mtl
+    , safe
     , split
     , text
     , text-format
@@ -124,6 +128,8 @@ test-suite AdventOfCode2021-test
     , dotenv
     , lens
     , linear
+    , mtl
+    , safe
     , split
     , text
     , text-format

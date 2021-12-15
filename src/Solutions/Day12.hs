@@ -12,6 +12,7 @@ import           GHC.Unicode         (isLower, isUpper)
 import           Text.Trifecta       (CharParsing (char), Parser,
                                       TokenParsing (token), letter, newline,
                                       some)
+import Common.ListUtils (allSets)
 
 aoc12 :: IO ()
 aoc12 = do
@@ -89,12 +90,6 @@ findPathsKnots system allowSecondVisit =
           | otherwise = lookupForChild child visitedTwice
         lookupForChild child visitedTwice' =
           memo M.! MkMemoKey child (S.insert cave visited) visitedTwice'
-
-allSets :: (Ord a) => [a] -> [S.Set a]
-allSets xs = gen
-  where
-    sizes = [0 .. length xs]
-    gen = map S.fromList $ concatMap (`tuples` xs) sizes
 
 data MemoKey =
   MkMemoKey
