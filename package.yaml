@@ -35,6 +35,7 @@ dependencies:
 - split
 - mtl
 - safe
+- parsec3-numbers
 
 library:
   source-dirs: src

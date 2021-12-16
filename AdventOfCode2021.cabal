@@ -76,6 +76,7 @@ library
     , lens
     , linear
     , mtl
+    , parsec3-numbers
     , safe
     , split
     , text
@@ -102,6 +103,7 @@ executable AdventOfCode2021-exe
     , lens
     , linear
     , mtl
+    , parsec3-numbers
     , safe
     , split
     , text
@@ -129,6 +131,7 @@ test-suite AdventOfCode2021-test
     , lens
     , linear
     , mtl
+    , parsec3-numbers
     , safe
     , split
     , text
