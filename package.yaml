@@ -36,6 +36,7 @@ dependencies:
 - mtl
 - safe
 - finite-typelits
+- ghci-hexcalc
 
 library:
   source-dirs: src

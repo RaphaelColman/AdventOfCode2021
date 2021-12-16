@@ -32,3 +32,6 @@ allSets xs = gen
   where
     sizes = [0 .. length xs]
     gen = map S.fromList $ concatMap (`tuples` xs) sizes
+
+singleton :: a -> [a]
+singleton x = [x]

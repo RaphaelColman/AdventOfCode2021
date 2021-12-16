@@ -6,7 +6,8 @@ module Solutions.Day16
 
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions, printTestSolutions)
-import           Common.BinaryUtils  (toDecimal)
+import           Common.BinaryUtils  (fromHex, pad0, toBinaryString, toDecimal)
+import           Common.ListUtils    (singleton)
 import           Control.Monad       (guard)
 import           Data.Finite         (Finite, finite)
 import qualified Data.Map            as M
@@ -57,7 +58,6 @@ addVersionNumbers = go 0
       where
         packetVals = foldr (flip go) 0 packets
 
-
 resolvePacket :: Packet -> Integer
 resolvePacket (PacketLiteral version value) = value
 resolvePacket pk@(PacketOperator version typeId packets) =
@@ -72,7 +72,8 @@ resolvePacket pk@(PacketOperator version typeId packets) =
     _ -> error ("unexpected operation: " ++ show typeId)
 
 twoPacketOp :: (Integer -> Integer -> Bool) -> Packet -> Integer
-twoPacketOp fun (PacketOperator version typeId [packet1, packet2]) = (toInteger . fromEnum) $ resolvePacket packet1 `fun` resolvePacket packet2
+twoPacketOp fun (PacketOperator version typeId [packet1, packet2]) =
+  (toInteger . fromEnum) $ resolvePacket packet1 `fun` resolvePacket packet2
 twoPacketOp _ pk = error ("unexpected twoPacketOp on packet: " ++ show pk)
 
 multiPacketOp :: ([Integer] -> Integer) -> Packet -> Integer
@@ -105,12 +106,10 @@ parsePacketOperator version typeId = do
     parseSection lengthSubpackets = do
       sectionToParse <- count (fromInteger lengthSubpackets) digit
       let result = parseString (some parsePacket) mempty sectionToParse
-      let asPackets =
-            foldResult
-              (\errInfo -> error ("Inner parser failed" ++ show errInfo))
-              id
-              result
-      pure asPackets
+      foldResult
+        (\errInfo -> fail ("Inner parser failed" ++ show errInfo))
+        pure
+        result
 
 data LengthTypeID
   = NumBits Integer
@@ -133,27 +132,4 @@ parseGroups = do
     _ -> fail $ "Unexpected non-binary digit" ++ show first
 
 hexLookup :: Char -> String
-hexLookup c = mp M.! c
-  where
-    hexDigits = "0123456789ABCDEF"
-    mp =
-      M.fromList $!
-      zip
-        hexDigits
-        [ "0000"
-        , "0001"
-        , "0010"
-        , "0011"
-        , "0100"
-        , "0101"
-        , "0110"
-        , "0111"
-        , "1000"
-        , "1001"
-        , "1010"
-        , "1011"
-        , "1100"
-        , "1101"
-        , "1110"
-        , "1111"
-        ]
+hexLookup = pad0 4 . toBinaryString . fromHex . singleton
