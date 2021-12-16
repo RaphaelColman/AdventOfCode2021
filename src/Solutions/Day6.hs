@@ -9,6 +9,7 @@ import           Data.List           (group)
 import qualified Data.Map            as M
 import qualified Data.Sequence       as S
 import           Text.Trifecta       (Parser, commaSep, integer)
+import Control.Monad.Trans.State.Lazy (runState, modify)
 
 aoc6 :: IO ()
 aoc6 = do
@@ -36,11 +37,12 @@ modularDecrement i =
         else aged
 
 stepFishColony :: FishColony -> FishColony
-stepFishColony fc = aged
+stepFishColony fc = snd . flip runState fc $ do
+      modify $ M.insert 9 numZeros
+      modify $ M.mapKeysWith (+) modularDecrement
+      modify $ M.filter (/=0)
   where
     numZeros = M.findWithDefault 0 0 fc
-    newFish = M.insert 9 numZeros fc
-    aged = M.filter (/= 0) $ M.mapKeysWith (+) modularDecrement newFish
 
 runFishColony :: Int -> FishColony -> Integer
 runFishColony times fc = M.foldr (+) 0 $ iterate stepFishColony fc !! times
