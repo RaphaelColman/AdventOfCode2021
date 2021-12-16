@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       Common.AoCSolutions
+      Common.BinaryUtils
       Common.Debugging
       Common.EnumUtils
       Common.FileUtils
@@ -73,10 +74,10 @@ library
     , containers
     , directory
     , dotenv
+    , finite-typelits
     , lens
     , linear
     , mtl
-    , parsec3-numbers
     , safe
     , split
     , text
@@ -100,10 +101,10 @@ executable AdventOfCode2021-exe
     , containers
     , directory
     , dotenv
+    , finite-typelits
     , lens
     , linear
     , mtl
-    , parsec3-numbers
     , safe
     , split
     , text
@@ -128,10 +129,10 @@ test-suite AdventOfCode2021-test
     , containers
     , directory
     , dotenv
+    , finite-typelits
     , lens
     , linear
     , mtl
-    , parsec3-numbers
     , safe
     , split
     , text

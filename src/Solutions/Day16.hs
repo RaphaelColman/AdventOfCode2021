@@ -1,13 +1,19 @@
-module Solutions.Day16 where
+{-# LANGUAGE DataKinds #-}
+
+module Solutions.Day16
+  ( aoc16
+  ) where
 
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions, printTestSolutions)
+import           Common.BinaryUtils  (toDecimal)
 import           Control.Monad       (guard)
+import           Data.Finite         (Finite, finite)
 import qualified Data.Map            as M
-import           Text.Trifecta       (CharParsing (char), Parser,
+import           Text.Trifecta       (CharParsing (char), Parser, Result,
                                       TokenParsing (token), choice, count,
                                       digit, foldResult, hexDigit, many,
-                                      parseString, some, Result)
+                                      parseString, some)
 
 aoc16 :: IO ()
 aoc16 = do
@@ -26,7 +32,8 @@ part1 input = addVersionNumbers <$> result
 
 part2 :: String -> Result Integer
 part2 input = resolvePacket <$> result
-  where result = parseString parsePacket mempty input
+  where
+    result = parseString parsePacket mempty input
 
 data Packet
   = PacketLiteral
@@ -35,10 +42,12 @@ data Packet
       }
   | PacketOperator
       { version :: Integer
-      , typeId  :: Integer
+      , typeId  :: TypeId
       , packets :: [Packet]
       }
   deriving (Eq, Show)
+
+type TypeId = Finite 8
 
 addVersionNumbers :: Packet -> Integer
 addVersionNumbers = go 0
@@ -48,51 +57,23 @@ addVersionNumbers = go 0
       where
         packetVals = foldr (flip go) 0 packets
 
+
 resolvePacket :: Packet -> Integer
 resolvePacket (PacketLiteral version value) = value
 resolvePacket pk@(PacketOperator version typeId packets) =
   case typeId of
-    0 -> sumOp pk
-    1 -> prodOp pk
-    2 -> minOp pk
-    3 -> maxOp pk
-    5 -> greaterOp pk
-    6 -> lessOp pk
-    7 -> equalOp pk
+    0 -> multiPacketOp sum pk
+    1 -> multiPacketOp product pk
+    2 -> multiPacketOp minimum pk
+    3 -> multiPacketOp maximum pk
+    5 -> twoPacketOp (>) pk
+    6 -> twoPacketOp (<) pk
+    7 -> twoPacketOp (==) pk
     _ -> error ("unexpected operation: " ++ show typeId)
 
-sumOp :: Packet -> Integer
-sumOp = multiPacketOp sum
-
-prodOp :: Packet -> Integer
-prodOp = multiPacketOp product
-
-minOp :: Packet -> Integer
-minOp = multiPacketOp minimum
-
-maxOp :: Packet -> Integer
-maxOp = multiPacketOp maximum
-
-greaterOp :: Packet -> Integer
-greaterOp (PacketOperator version typeId [packet1, packet2]) =
-  if resolvePacket packet1 > resolvePacket packet2
-    then 1
-    else 0
-greaterOp pk = error ("unexpected greaterOp on packet: " ++ show pk)
-
-lessOp :: Packet -> Integer
-lessOp (PacketOperator version typeId [packet1, packet2]) =
-  if resolvePacket packet1 < resolvePacket packet2
-    then 1
-    else 0
-lessOp pk = error ("unexpected lessOp on packet: " ++ show pk)
-
-equalOp :: Packet -> Integer
-equalOp (PacketOperator version typeId [packet1, packet2]) =
-  if resolvePacket packet1 == resolvePacket packet2
-    then 1
-    else 0
-equalOp pk = error ("unexpected equalOp on packet: " ++ show pk)
+twoPacketOp :: (Integer -> Integer -> Bool) -> Packet -> Integer
+twoPacketOp fun (PacketOperator version typeId [packet1, packet2]) = (toInteger . fromEnum) $ resolvePacket packet1 `fun` resolvePacket packet2
+twoPacketOp _ pk = error ("unexpected twoPacketOp on packet: " ++ show pk)
 
 multiPacketOp :: ([Integer] -> Integer) -> Packet -> Integer
 multiPacketOp fun packet =
@@ -103,12 +84,12 @@ multiPacketOp fun packet =
 parsePacket :: Parser Packet
 parsePacket = do
   version <- toDecimal <$> count 3 digit
-  typeId <- toDecimal <$> count 3 digit
+  typeId <- finite . toDecimal <$> count 3 digit
   if typeId == 4
     then parsePacketLiteral version
     else parsePacketOperator version typeId
 
-parsePacketOperator :: Integer -> Integer -> Parser Packet
+parsePacketOperator :: Integer -> TypeId -> Parser Packet
 parsePacketOperator version typeId = do
   lengthTypeId <- digit >>= lengthLookup
   subPackets <-
@@ -143,19 +124,13 @@ parsePacketLiteral version = do
 
 parseGroups :: Parser String
 parseGroups = do
-  midGroups <- many parseMidGroup
-  lastGroup <- parseLastGroup
-  pure $ concat midGroups ++ lastGroup
-
-parseLastGroup :: Parser String
-parseLastGroup = do
-  char '0'
-  count 4 digit
-
-parseMidGroup :: Parser String
-parseMidGroup = do
-  char '1'
-  count 4 digit
+  first <- digit
+  case first of
+    '0' -> count 4 digit
+    '1' -> do
+      thisGroup <- count 4 digit
+      (thisGroup ++) <$> parseGroups
+    _ -> fail $ "Unexpected non-binary digit" ++ show first
 
 hexLookup :: Char -> String
 hexLookup c = mp M.! c
@@ -182,9 +157,3 @@ hexLookup c = mp M.! c
         , "1110"
         , "1111"
         ]
-
-toDecimal :: String -> Integer
-toDecimal = sum . (zipWith (*) [2 ^ n | n <- [0,1 ..]]) . reverse . asIntList
-  where
-    asIntList :: String -> [Integer]
-    asIntList = map (toInteger . \c -> read [c])

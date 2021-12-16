@@ -35,7 +35,7 @@ dependencies:
 - split
 - mtl
 - safe
-- parsec3-numbers
+- finite-typelits
 
 library:
   source-dirs: src
