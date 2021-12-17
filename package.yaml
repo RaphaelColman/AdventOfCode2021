@@ -36,7 +36,7 @@ dependencies:
 - mtl
 - safe
 - finite-typelits
-- ghci-hexcalc
+- monad-loops
 
 library:
   source-dirs: src

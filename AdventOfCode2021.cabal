@@ -34,6 +34,7 @@ library
       Common.Geometry
       Common.ListUtils
       Common.MapUtils
+      Common.MathUtils
       Common.MaybeUtils
       Common.Predicates
       Lib
@@ -75,9 +76,9 @@ library
     , directory
     , dotenv
     , finite-typelits
-    , ghci-hexcalc
     , lens
     , linear
+    , monad-loops
     , mtl
     , safe
     , split
@@ -103,9 +104,9 @@ executable AdventOfCode2021-exe
     , directory
     , dotenv
     , finite-typelits
-    , ghci-hexcalc
     , lens
     , linear
+    , monad-loops
     , mtl
     , safe
     , split
@@ -132,9 +133,9 @@ test-suite AdventOfCode2021-test
     , directory
     , dotenv
     , finite-typelits
-    , ghci-hexcalc
     , lens
     , linear
+    , monad-loops
     , mtl
     , safe
     , split
