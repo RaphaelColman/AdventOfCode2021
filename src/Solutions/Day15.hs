@@ -69,9 +69,9 @@ unfoldGrid grid = ($!) M.unions [grid, verticals]
   where
     (V2 x y) = bottomRight grid
     translateHorizontal g amount =
-      M.map (addWrap amount) $ M.mapKeys (\v -> v + V2 (amount * x) 0) g
+      M.map (addWrap amount) $ M.mapKeys (\v -> v + V2 (amount * (x + 1)) 0) g
     translateVertical g amount =
-      M.map (addWrap amount) $ M.mapKeys (\v -> v + V2 0 (amount * y)) g
+      M.map (addWrap amount) $ M.mapKeys (\v -> v + V2 0 (amount * (y + 1))) g
     horizontals = M.unions $! map (translateHorizontal grid) [0 .. 4]
     verticals = M.unions $! map (translateVertical horizontals) [0 .. 4]
 

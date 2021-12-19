@@ -19,6 +19,8 @@
     - [Day 11](#day-11)
     - [Day 12](#day-12)
     - [Day 13](#day-13)
+    - [Day 14](#day-14)
+    - [Day 15](#day-15)
 
 ### Overview
 This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
@@ -982,3 +984,67 @@ applyFold fold points =
     XFold n -> doFold n inX points
 ```
 I don't know about you, but I find it _really_ pleasing that both parts call the function `foldl` over a `Foldable` full of datatypes called `Fold`.
+
+### Day 14
+Today was one of those ones where you suspect you're going to get hit by something because part 1 is straightforward. The algorithm is pretty easy to implement, and happily involves using that `window2` function we wrote for puzzle number 1.
+```haskell
+type Element = String
+
+type Rule = (String, Char)
+
+type Pair = (Char, Char)
+
+type Template = (Element, M.Map Pair Char)
+
+runTemplateNaive :: Int -> Template -> String
+runTemplateNaive times (start, rules) = iterate step start !! times
+  where
+    step current = head current : concatMap insert (window2 current)
+    insert p@(a, b) = [rules M.! p, b]
+```
+I've called this one 'runTemplateNaive' because now I know that part2 is the classic AoC: 'I know you've implemented something ineffecient, hold on a sec while I set your CPU on fire'. Of course, laziness lists makes it even worse in Haskell because running this 30 more times uses of loads of memory as it builds up sequences of [thunks](https://wiki.haskell.org/Thunk) that it will, eventually, have to evaluate.
+
+I spent a while with a pen and paper trying to do something overcomplicated with [cycles](https://media.giphy.com/media/DAkTj5U6okQY8/giphy.gif). You can draw a pretty graph to see that any one pair will either eventually produce itself after a few iterations, or produce a pair which will start cycle to itself.
+Then I realised: You can just implement this like the Lanternfish puzzle! We keep a map of Pair -> Int, and just fold through it, updating our map and keeping a running total of all the new characters we added. As we often do, it helps to define some sort of state for our loop:
+```haskell
+data RunningTotal =
+  MkRT
+    { pairCount    :: PairCount
+    , elementCount :: ElementCount
+    }
+  deriving (Eq, Show)
+
+initRT :: Template -> RunningTotal
+initRT (start, rules) = MkRT pc $ freqs start
+  where
+    pc = freqs $ window2 start
+```
+
+Then, we define a function which, given a running total, will produce the new running total. It's a little more complicated than the lantern fish, because you have to update the running total for each pair in the `PairCount` map, so your main logic is actually: given a pair and the number of times it occurs, give ma new running total. My one looked like this:
+```haskell
+runTemplate :: Int -> Template -> RunningTotal
+runTemplate times template@(_, rules) =
+  iterate stepRT (initRT template) !! times
+  where
+    stepRT :: RunningTotal -> RunningTotal
+    stepRT rt@(MkRT pairCount _) = M.foldrWithKey go rt pairCount
+      where
+        go :: Pair -> Int -> RunningTotal -> RunningTotal
+        go pair@(a, b) num (MkRT pc ec) =
+          let insert = rules M.! pair
+              newElementCount = M.insertWith (+) insert num ec
+              updates =
+                M.fromListWith (+) $
+                (pair, negate num) : map (, num) [(a, insert), (insert, b)]
+              newPc = M.filter (>= 0) $ M.unionWith (+) updates pc
+           in MkRT newPc newElementCount
+```
+I'm not sure how many nested functions you're allowed before it's taking the piss. The important stuff is in `go`. That one will update the `ElementCount` by adding the 'new' character the right number of times. Then we update our pair count by updating the count of the following:
+1. The current pair: we've just split it up, so it needs to be decremented (that's the `negate num` bit)
+2. The two new pairs we get from inserting the new character (`insert`). These should be incremented
+
+A little `foldrWithKey` does the trick here, by folding through each element in the `pairCount` map. In retrospect, this could be made even simpler by not bothering to keep a running total. You could instead just count the first element of every pair in the `PairCount` remembering to track whatever the final character is at the end.
+
+This was a great puzzle, but I got really frustrated with it because my first passes at puzzle 2 worked for the test input but not for the actual input. I had a stupid bug where `initTemplate` initialised all the pairs to have a count of 1, which happens to be true for the test input. What a pain to debug!
+
+### Day 15

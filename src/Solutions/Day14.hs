@@ -9,7 +9,6 @@ import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
 import           Common.ListUtils    (freqs, window2)
 import           Data.List           (sort)
 import qualified Data.Map            as M
-import Control.Monad.State
 import           Text.Trifecta       (CharParsing (string), Parser,
                                       TokenParsing (token), count, letter, some,
                                       whiteSpace)
@@ -85,8 +84,9 @@ runTemplate times template@(_, rules) =
         go :: Pair -> Int -> RunningTotal -> RunningTotal
         go pair@(a, b) num (MkRT pc ec) =
           let insert = rules M.! pair
-              newPairs = M.fromList $ map (, num) [(a, insert), (insert, b)]
               newElementCount = M.insertWith (+) insert num ec
-              withPairRemoved = M.adjust (\p -> p - num) pair pc
-              newPc = M.filter (>= 0) $ M.unionWith (+) newPairs withPairRemoved
+              updates =
+                M.fromListWith (+) $
+                (pair, negate num) : map (, num) [(a, insert), (insert, b)]
+              newPc = M.filter (>= 0) $ M.unionWith (+) updates pc
            in MkRT newPc newElementCount

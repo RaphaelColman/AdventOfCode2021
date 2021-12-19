@@ -37,6 +37,7 @@ dependencies:
 - safe
 - finite-typelits
 - monad-loops
+- monad-extras
 
 library:
   source-dirs: src

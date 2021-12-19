@@ -78,6 +78,7 @@ library
     , finite-typelits
     , lens
     , linear
+    , monad-extras
     , monad-loops
     , mtl
     , safe
@@ -106,6 +107,7 @@ executable AdventOfCode2021-exe
     , finite-typelits
     , lens
     , linear
+    , monad-extras
     , monad-loops
     , mtl
     , safe
@@ -135,6 +137,7 @@ test-suite AdventOfCode2021-test
     , finite-typelits
     , lens
     , linear
+    , monad-extras
     , monad-loops
     , mtl
     , safe
