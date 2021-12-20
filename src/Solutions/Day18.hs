@@ -1,25 +1,28 @@
 module Solutions.Day18 where
 
-import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
-                                      printSolutions, printTestSolutions)
-import           Common.EnumUtils    (enumNext)
-import           Control.Applicative ((<|>))
-import           Control.Monad.Loops (iterateUntilM)
-import           Data.Foldable       (foldlM)
-import           Data.Function
-import           Data.List           (findIndex)
-import           Data.Maybe          (fromJust)
-import           Debug.Trace
-import           Text.Trifecta       (CharParsing (char), Parser, brackets,
-                                      integer, parens)
+import           Combinatorics                  (variate)
+import           Common.AoCSolutions            (AoCSolution (MkAoCSolution),
+                                                 printSolutions,
+                                                 printTestSolutions)
+import           Common.EnumUtils               (enumNext)
+import           Control.Applicative            ((<|>))
+import           Control.Monad.Loops            (iterateUntilM)
+import           Control.Monad.Trans.State.Lazy (get, modify, runState)
+import           Data.Foldable                  (foldlM)
+import           Data.Function                  ((&))
+import           Data.List                      (findIndex, foldl1', unfoldr)
+import           Data.Maybe                     (fromJust, fromMaybe)
+import           Text.Trifecta                  (CharParsing (char), Parser,
+                                                 brackets, integer, parens,
+                                                 some, token)
 
 aoc18 :: IO ()
 aoc18 = do
-  printTestSolutions 18 $ MkAoCSolution parseInput part1
-  --printSolutions 18 $ MkAoCSolution parseInput part2
+  printSolutions 18 $ MkAoCSolution parseInput part1
+  printSolutions 18 $ MkAoCSolution parseInput part2
 
-parseInput :: Parser Tree
-parseInput = parsePair
+parseInput :: Parser [Tree]
+parseInput = some $ token parsePair
 
 parsePair :: Parser Tree
 parsePair = do
@@ -30,15 +33,25 @@ parsePair = do
   where
     parsePairElement = Leaf <$> integer <|> parsePair
 
---part1 :: Tree -> Tree
-part1 tree = toFirstExplodable tree >>= neighbour LEFT
+part1 :: [Tree] -> Integer
+part1 = magnitude . sumTrees
 
-part2 = undefined
+part2 :: [Tree] -> Integer
+part2 = maximum . map (magnitude . sumTrees) . variate 2
+
+sumTrees :: [Tree] -> Tree
+sumTrees = foldl1' go
+  where
+    go tree1 tree2 = simplify $ tree1 `add` tree2
 
 data Tree
   = Pair Tree Tree
   | Leaf Integer
-  deriving (Eq, Show)
+  deriving (Eq)
+
+instance Show Tree where
+  show (Leaf i)   = show i
+  show (Pair l r) = show [l, r]
 
 data Direction
   = LEFT
@@ -56,6 +69,12 @@ data Crumb =
 
 type Zipper = (Tree, Breadcrumbs)
 
+simplify :: Tree -> Tree
+simplify tree =
+  case explode tree of
+    Just t  -> simplify t
+    Nothing -> maybe tree simplify (split tree)
+
 zipDown :: Direction -> Zipper -> Maybe Zipper
 zipDown direction (Pair l r, bs) =
   case direction of
@@ -70,8 +89,8 @@ zipUp (tree, bc:rest) =
     Crumb RIGHT subTree -> Just (Pair subTree tree, rest)
 zipUp (_, []) = Nothing
 
-zipToTop :: Zipper -> Zipper
-zipToTop zipper@(tree, [])      = zipper
+zipToTop :: Zipper -> Tree
+zipToTop zipper@(tree, [])      = tree
 zipToTop zipper@(tree, bc:rest) = fromJust $ zipToTop <$> zipUp zipper
 
 neighbour :: Direction -> Zipper -> Maybe Zipper
@@ -94,13 +113,15 @@ previousDirection :: Zipper -> Maybe Direction
 previousDirection (_, (Crumb direction _):_) = Just direction
 previousDirection _                          = Nothing
 
-modify :: Tree -> Zipper -> Zipper
-modify newValue (tree, bs) = (newValue, bs)
+modifyZipper :: Tree -> Zipper -> Zipper
+modifyZipper newValue (tree, bs) = (newValue, bs)
 
-modifyAt :: Tree -> Tree -> [Direction] -> Maybe Tree
-modifyAt newValue tree directions = do
-  atSubTree <- foldlM (flip zipDown) asZipper directions
-  pure $ fst $ modify newValue atSubTree & zipToTop
+addAtLeaf :: Integer -> [Direction] -> Tree -> Maybe Tree
+addAtLeaf toAdd directions tree = do
+  zipper@(atSubTree, bs) <- foldlM (flip zipDown) asZipper directions
+  case atSubTree of
+    Leaf i   -> pure $ modifyZipper (Leaf (i + toAdd)) zipper & zipToTop
+    Pair _ _ -> Nothing
   where
     asZipper = (tree, [])
 
@@ -118,11 +139,52 @@ toFirstExplodable tree = go 0 (tree, [])
         let rightBranch = zipDown RIGHT zipper >>= go (depth + 1)
         leftBranch <|> rightBranch
 
-explode :: Zipper -> Tree
-explode zipper@(Pair l r, bs) = undefined
+explode :: Tree -> Maybe Tree
+explode tree = do
+  zipper@(Pair (Leaf l) (Leaf r), bs) <- toFirstExplodable tree
+  let with0 = zipper & modifyZipper (Leaf 0) & zipToTop
+  let leftCarry =
+        fromMaybe with0 $
+        neighbour LEFT zipper >>= carry LEFT l with0 . extractDirections
+  let rightCarry =
+        fromMaybe leftCarry $
+        neighbour RIGHT zipper >>= carry LEFT r leftCarry . extractDirections
+  pure rightCarry
   where
-    lNeighbour = neighbour LEFT zipper
-    rNeighbour = neighbour RIGHT zipper
+    carry :: Direction -> Integer -> Tree -> [Direction] -> Maybe Tree
+    carry direction value tree' directions = addAtLeaf value directions tree'
 
 extractDirections :: Zipper -> [Direction]
-extractDirections (_, bs) = map _direction bs
+extractDirections (_, bs) = reverse $ map _direction bs
+
+toFirstSplittable :: Tree -> Maybe Zipper
+toFirstSplittable tree = go (tree, [])
+  where
+    go :: Zipper -> Maybe Zipper
+    go zipper@(Leaf i, bs)
+      | i >= 10 = Just zipper
+      | otherwise = Nothing
+    go zipper@(tree, bs) = do
+      let leftBranch = zipDown LEFT zipper >>= go
+      let rightBranch = zipDown RIGHT zipper >>= go
+      leftBranch <|> rightBranch
+
+split :: Tree -> Maybe Tree
+split tree = do
+  zipper@(Leaf l, bs) <- toFirstSplittable tree
+  let (lft, rt) = splitInteger l
+  pure $ modifyZipper (Pair (Leaf lft) (Leaf rt)) zipper & zipToTop
+
+splitInteger :: Integer -> (Integer, Integer)
+splitInteger i =
+  let divided = i `div` 2
+   in (divided, i - divided)
+
+add :: Tree -> Tree -> Tree
+add = Pair
+
+magnitude :: Tree -> Integer
+magnitude = go
+  where
+    go (Leaf i)     = i
+    go (Pair p1 p2) = (3 * go p1) + (2 * go p2)
