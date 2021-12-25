@@ -1,6 +1,6 @@
 module Solutions.Day19 where
 
-import           Combinatorics       (variate)
+import           Combinatorics       (tuples)
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions, printTestSolutions)
 import           Control.Monad       (msum)
@@ -18,8 +18,8 @@ import           Text.Trifecta       (CharParsing (char, string), Parser,
 
 aoc19 :: IO ()
 aoc19 = do
-  printSolutions 19 $ MkAoCSolution parseInput part1
-  --printSolutions 19 $ MkAoCSolution parseInput part2
+  printTestSolutions 19 $ MkAoCSolution parseInput part1
+  printSolutions 19 $ MkAoCSolution parseInput part2
 
 parseInput :: Parser [Scanner]
 parseInput = some $ token parseScanner
@@ -38,14 +38,20 @@ parseInput = some $ token parseScanner
 
 part1 :: [Scanner] -> Maybe Int
 part1 scanners = do
+  assembled <- assemble scanners
+  pure $ length $ S.unions $ map _beacons assembled
+
+part2 :: [Scanner] -> Maybe Integer
+part2 scanners = do
+  locations <- map _location <$> assemble scanners
+  pure $
+    maximum $ map (\[p1, p2] -> manhattanDistance p1 p2) $ tuples 2 locations
+
+assemble :: [Scanner] -> Maybe [Scanner]
+assemble scanners = do
   let (scanner0:rest) = scanners
   let queue = MkSQ [scanner0] $ Seq.fromList rest
-  run <- runQueue queue
-  pure $
-    length $ foldr (\(MkScanner beacons _) bs -> S.union beacons bs) S.empty run
-
-part2 :: String -> String
-part2 = undefined
+  runQueue queue
 
 type Point = V3 Integer
 
@@ -118,3 +124,8 @@ stepQueue (MkSQ found remaining) = do
   case orientated of
     Just o  -> pure $ MkSQ (o : found) restOfList
     Nothing -> pure $ MkSQ found (restOfList Seq.|> tryScanner)
+
+manhattanDistance :: Point -> Point -> Integer
+manhattanDistance p1 p2 = x + y + z
+  where
+    (V3 x y z) = p1 - p2
