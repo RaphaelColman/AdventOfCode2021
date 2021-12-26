@@ -18,7 +18,7 @@ import           Text.Trifecta       (CharParsing (char, string), Parser,
 
 aoc19 :: IO ()
 aoc19 = do
-  printTestSolutions 19 $ MkAoCSolution parseInput part1
+  printSolutions 19 $ MkAoCSolution parseInput part1
   printSolutions 19 $ MkAoCSolution parseInput part2
 
 parseInput :: Parser [Scanner]
@@ -31,7 +31,7 @@ parseInput = some $ token parseScanner
       pure $ MkScanner (S.fromList points) (V3 0 0 0)
     parsePoint :: Parser Point
     parsePoint
-      --Stupid '-' delimiter means you have to try parsing it has a integer, then fail if it's actually a header
+      --Stupid '-' delimiter means you have to try parsing it as a integer, then fail if it's actually a header
      = do
       [x, y, z] <- try $ commaSep integer
       pure $ V3 x y z
@@ -126,6 +126,5 @@ stepQueue (MkSQ found remaining) = do
     Nothing -> pure $ MkSQ found (restOfList Seq.|> tryScanner)
 
 manhattanDistance :: Point -> Point -> Integer
-manhattanDistance p1 p2 = x + y + z
-  where
-    (V3 x y z) = p1 - p2
+manhattanDistance (V3 x1 y1 z1) (V3 x2 y2 z2) =
+  abs (x1 - x2) + abs (y1 - y2) + abs (z1 - z2)
