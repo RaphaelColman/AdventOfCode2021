@@ -1048,3 +1048,26 @@ A little `foldrWithKey` does the trick here, by folding through each element in 
 This was a great puzzle, but I got really frustrated with it because my first passes at puzzle 2 worked for the test input but not for the actual input. I had a stupid bug where `initTemplate` initialised all the pairs to have a count of 1, which happens to be true for the test input. What a pain to debug!
 
 ### Day 15
+Fab puzzle today! Find the path of lowest cost from a start node to a finish node. I started by writing naive, hand-baked recursive solution and realised it was never going to work when it slowed to crawl on the test input. After some frantic googling, I decided that the solution would be to implement [Dijkstra's Algorithm](https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm). Believe it or not, I had heard of it before in [this xkcd comic](https://www.explainxkcd.com/wiki/index.php/342:_1337:_Part_2), but I had no idea what it was or how it worked.
+
+The idea is that you keep track of all the nodes you haven't visited yet (the _unvisited_ nodes) and you keep a map of 'tentative distances' - your best guess so far for how costly it is to get from the start node to this particular node. Those distances all start of as infinity. Then your algorithm is to update the tentative distances of all your neighbour nodes by adding their cost to your current cost, then visit the least costly neighbour and repeat.
+
+```haskell
+dijkstra :: Grid Int -> Int
+dijkstra grid = go (V2 0 0) (M.fromList [(V2 0 0, 0)]) $ M.keysSet grid
+  where
+    bottomRight' = bottomRight grid
+    go current tDistances unvisited
+      | current == bottomRight' = tDistances M.! current
+      | otherwise = ($!) go minNode newTDistances newUnvisited
+      where
+        children = gridOrthogonalNeighbours grid current
+        unVisitedChildren = M.restrictKeys children unvisited
+        distances = M.map (+ tDistances M.! current) unVisitedChildren
+        newTDistances = M.unionWith min distances tDistances
+        newUnvisited = S.delete current unvisited
+        (minNode, value) =
+          minimumValue $ M.restrictKeys newTDistances newUnvisited
+```
+This is pretty much the whole puzzle, except there's one weird thing in there. Did you notice the crazy `($!)` operator? If you take that out, then this recursive function grinds to a halt. It's crazy slow. What's happening is that these new maps our function is creating are all lazy. Haskell just builds up a really long list of [thunks](https://wiki.haskell.org/Thunk) - computations that it promises to evaluate if it _really_ needs to. The problem is that it will eventually need to evaluate all of them, so it's just inefficient to build them all up in memory like that.
+The answer is the `($!)` operator, which forces strict evaluation for everything on the right-hand side of it. Once I realised what was happening and added that, the program went from running in about 1 minute to about 1 second for part 1.
