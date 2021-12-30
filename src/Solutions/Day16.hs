@@ -14,12 +14,13 @@ import qualified Data.Map            as M
 import           Text.Trifecta       (CharParsing (char), Parser, Result,
                                       TokenParsing (token), choice, count,
                                       digit, foldResult, hexDigit, many,
-                                      parseString, some)
+                                      parseString, some, Parsing (try))
+import Control.Applicative ((<|>))
 
 aoc16 :: IO ()
 aoc16 = do
-  printSolutions 16 $ MkAoCSolution parseInput part1
-  printSolutions 16 $ MkAoCSolution parseInput part2
+  printTestSolutions 16 $ MkAoCSolution parseInput part1
+  printTestSolutions 16 $ MkAoCSolution parseInput part2
 
 parseInput :: Parser String
 parseInput = do
@@ -84,14 +85,13 @@ multiPacketOp fun packet =
 
 parsePacket :: Parser Packet
 parsePacket = do
+  try parsePacketLiteral <|> try parsePacketOperator
+
+parsePacketOperator :: Parser Packet
+parsePacketOperator = do
   version <- toDecimal <$> count 3 digit
   typeId <- finite . toDecimal <$> count 3 digit
-  if typeId == 4
-    then parsePacketLiteral version
-    else parsePacketOperator version typeId
-
-parsePacketOperator :: Integer -> TypeId -> Parser Packet
-parsePacketOperator version typeId = do
+  guard $ typeId /= 4
   lengthTypeId <- digit >>= lengthLookup
   subPackets <-
     case lengthTypeId of
@@ -100,8 +100,8 @@ parsePacketOperator version typeId = do
   pure $ PacketOperator version typeId subPackets
   where
     lengthLookup l
-      | l == '0' = NumBits . toDecimal <$> count 15 digit --This is correct - number representing length in bits of subpackets
-      | l == '1' = NumPackets . toDecimal <$> count 11 digit --This is wrong - number represenging the number of subpackets
+      | l == '0' = NumBits . toDecimal <$> count 15 digit
+      | l == '1' = NumPackets . toDecimal <$> count 11 digit
       | otherwise = fail "Unexpected non-binary digit"
     parseSection lengthSubpackets = do
       sectionToParse <- count (fromInteger lengthSubpackets) digit
@@ -116,8 +116,11 @@ data LengthTypeID
   | NumPackets Integer
   deriving (Eq, Show)
 
-parsePacketLiteral :: Integer -> Parser Packet
-parsePacketLiteral version = do
+parsePacketLiteral :: Parser Packet
+parsePacketLiteral = do
+  version <- toDecimal <$> count 3 digit
+  typeId <- toDecimal <$> count 3 digit
+  guard $ typeId == 4
   groups <- toDecimal <$> parseGroups
   pure $ PacketLiteral version groups
 

@@ -21,6 +21,7 @@
     - [Day 13](#day-13)
     - [Day 14](#day-14)
     - [Day 15](#day-15)
+    - [Day 16](#day-16)
 
 ### Overview
 This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
@@ -1071,3 +1072,141 @@ dijkstra grid = go (V2 0 0) (M.fromList [(V2 0 0, 0)]) $ M.keysSet grid
 ```
 This is pretty much the whole puzzle, except there's one weird thing in there. Did you notice the crazy `($!)` operator? If you take that out, then this recursive function grinds to a halt. It's crazy slow. What's happening is that these new maps our function is creating are all lazy. Haskell just builds up a really long list of [thunks](https://wiki.haskell.org/Thunk) - computations that it promises to evaluate if it _really_ needs to. The problem is that it will eventually need to evaluate all of them, so it's just inefficient to build them all up in memory like that.
 The answer is the `($!)` operator, which forces strict evaluation for everything on the right-hand side of it. Once I realised what was happening and added that, the program went from running in about 1 minute to about 1 second for part 1.
+
+### Day 16
+Let's talk about [parser combinators!](https://en.wikipedia.org/wiki/Parser_combinator) Parser Combinators allow you build up big parsers from small ones. So you might define a simple parser that just parses a literal character like a ':'. Then another parser which parses all alphanumeric characters until it reaches a character which isn't alphanumeric. Maybe another which parses newlines. Before you know it, you have a load of parsers which can be composed to parse a YAML file.
+
+Parsers in Haskell are monads (all the best things are). The 'effect' of this particular monad is to consume characters in the input stream. So that means the tools around monads are _really_ useful. You can do things like trigger the effect of the monad without worrying about the result (so just ignore some specific characters in the input stream). The `Parser` we're using implements the [Alternative](https://hackage.haskell.org/package/base-4.14.1.0/docs/Control-Applicative.html#t:Alternative) and [MonadFail](https://hackage.haskell.org/package/base-4.14.1.0/docs/Control-Monad-Fail.html#t:MonadFail) typeclasses, so it has some notion of failing or being empty. That means we can do neat things like attempt to parse some characters, and then roll back to the last 'good' character if we failed. It's _awesome_!
+
+To start off, we need to convert a series of two-digit hex numbers into a string of binary digits. That's our first parser:
+```haskell
+import Numeric.Lens ( binary, hex )
+import Control.Lens ((^?), (^?!), (^.), re)
+hexLookup :: Char -> String
+hexLookup = pad0 4 . toBinaryString . fromHex . singleton
+
+fromHex :: Integral a => String -> a
+fromHex str = str ^?! hex
+
+toBinaryString :: Integral s => s -> String
+toBinaryString x = x ^. re binary
+
+pad0 :: Int -> String -> String
+pad0 targetLen str = replicate times '0' ++ str
+  where times = targetLen - length str
+
+parseInput :: Parser String
+parseInput = do
+  binaryNumbers <- some $ hexLookup <$> hexDigit
+  pure $ concat binaryNumbers
+```
+The convenient but often complicated `Control.Lens` package has some convenience functions for converting between binary and hex.
+
+Our model will look something like this:
+```haskell
+data Packet
+  = PacketLiteral
+      { version :: Integer
+      , value   :: Integer
+      }
+  | PacketOperator
+      { version :: Integer
+      , typeId  :: TypeId
+      , packets :: [Packet]
+      }
+  deriving (Eq, Show)
+
+type TypeId = Finite 8
+```
+Finite is a nice library. TypeId is not allowed to be 8 or above.
+
+Next, let's start off simple. We need to be able to parse a 'literal' packet - that's one where the `typeId` is 4.
+```haskell
+parsePacketLiteral :: Parser Packet
+parsePacketLiteral = do
+  version <- toDecimal <$> count 3 digit
+  typeId <- toDecimal <$> count 3 digit
+  guard $ typeId == 4
+  groups <- toDecimal <$> parseGroups
+  pure $ PacketLiteral version groups
+
+parseGroups :: Parser String
+parseGroups = do
+  first <- digit
+  case first of
+    '0' -> count 4 digit
+    '1' -> do
+      thisGroup <- count 4 digit
+      (thisGroup ++) <$> parseGroups
+    _ -> fail $ "Unexpected non-binary digit" ++ show first
+```
+One of the things that is so nice about this model is the idea of the parser 'consuming' characters as it parses. Ironically, the code reads very imperatively, even though it's still pure and functional. We first parse a version, then a typeId. Then we use `guard` to check that the type id is 4 (if it's not that guard will invoke `fail` to cause the parser to fail). `ParseGroups` uses recursion to keep parsing groups of 4 digits until we get the signal to stop (the '1' indicating the last group).
+
+The operator parsing is a little more complicated. This concept of a `LengthTypeID` means we might be parsing a specific number of subpackets, or a specific number of characters. With Trifecta, I couldn't find a nice way of doing a specific number of characters except for creating a whole new parser and handling the `Result` of the inner parser explicitly. A specific number of packets is easy though, because we just use `count`.
+```haskell
+data LengthTypeID
+  = NumBits Integer
+  | NumPackets Integer
+  deriving (Eq, Show)
+
+parsePacketOperator :: Parser Packet
+parsePacketOperator = do
+  version <- toDecimal <$> count 3 digit
+  typeId <- finite . toDecimal <$> count 3 digit
+  guard $ typeId /= 4
+  lengthTypeId <- digit >>= lengthLookup
+  subPackets <-
+    case lengthTypeId of
+      NumBits n    -> parseSection n
+      NumPackets n -> count (fromInteger n) parsePacket
+  pure $ PacketOperator version typeId subPackets
+  where
+    lengthLookup l
+      | l == '0' = NumBits . toDecimal <$> count 15 digit
+      | l == '1' = NumPackets . toDecimal <$> count 11 digit
+      | otherwise = fail "Unexpected non-binary digit"
+    parseSection lengthSubpackets = do
+      sectionToParse <- count (fromInteger lengthSubpackets) digit
+      let result = parseString (some parsePacket) mempty sectionToParse
+      foldResult
+        (\errInfo -> fail ("Inner parser failed" ++ show errInfo))
+        pure
+        result
+```
+This one starts off similarly. It then uses our `LengthTypeID` data type to figure out if we're parsing a specific number of bits or a specific number of packets. The `parseSection` internal function uses `parseString` to invoke a whole new parser, and `foldResult` to handle the result. Both branches will use `parsePacket` which we haven't defined yet. Don't worry, that's the next thing!
+```haskell
+parsePacket :: Parser Packet
+parsePacket = do
+  try parsePacketLiteral <|> try parsePacketOperator
+```
+
+Just two new concepts to understand here. `try` will take a parser and 'rollback' the curser if the parser failed. `<|>` is the shorthand for `Alternatives`. The TLDR is it will use the `Alternative` on the left if it's not empty, otherwise it will use the one on the right.
+
+That's actually all we need to do the parsing. Okay, it's not a one-liner, but I would argue that if it weren't for that 'parse a specific number of bits' requirement it would look really simple. Part 2 of the puzzle is to evaluate all the packets according to their `typeId`, because we have now got a simple expression syntax (type id 0 means sum the inner packets together etc). This bit is pretty trivial:
+```haskell
+resolvePacket :: Packet -> Integer
+resolvePacket (PacketLiteral version value) = value
+resolvePacket pk@(PacketOperator version typeId packets) =
+  case typeId of
+    0 -> multiPacketOp sum pk
+    1 -> multiPacketOp product pk
+    2 -> multiPacketOp minimum pk
+    3 -> multiPacketOp maximum pk
+    5 -> twoPacketOp (>) pk
+    6 -> twoPacketOp (<) pk
+    7 -> twoPacketOp (==) pk
+    _ -> error ("unexpected operation: " ++ show typeId)
+
+twoPacketOp :: (Integer -> Integer -> Bool) -> Packet -> Integer
+twoPacketOp fun (PacketOperator version typeId [packet1, packet2]) =
+  (toInteger . fromEnum) $ resolvePacket packet1 `fun` resolvePacket packet2
+twoPacketOp _ pk = error ("unexpected twoPacketOp on packet: " ++ show pk)
+
+multiPacketOp :: ([Integer] -> Integer) -> Packet -> Integer
+multiPacketOp fun packet =
+  case packet of
+    PacketLiteral _ value      -> value
+    PacketOperator _ _ packets -> fun $ map resolvePacket packets
+```
+Pattern matching allows us to use `resolvePacket` recursively until we hit a literal packet.
+I thoroughly enjoyed this puzzle. It feels like it was written with parser combinators in mind. I dread to think how complicated it would have been in a language without them.
