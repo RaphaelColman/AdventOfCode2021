@@ -22,6 +22,7 @@
     - [Day 14](#day-14)
     - [Day 15](#day-15)
     - [Day 16](#day-16)
+    - [Day 17](#day-17)
 
 ### Overview
 This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
@@ -1210,3 +1211,74 @@ multiPacketOp fun packet =
 ```
 Pattern matching allows us to use `resolvePacket` recursively until we hit a literal packet.
 I thoroughly enjoyed this puzzle. It feels like it was written with parser combinators in mind. I dread to think how complicated it would have been in a language without them.
+
+### Day 17
+Mechanics was not my strong suit in maths at school. I dimly remembered that there are formulae for calculating the trajectory of an object through space, but after a bit of googling I gave up and decided to just implement this one naively.
+
+I did later find out that part 1 can be solved with an insanely simple calculation. Along the y axis, the probe's descent from its max height can be solved using triangle numbers! After all, it starts by moving 1 unit, then 2, then 3 and so on, and that's what triangle numbers are. So a simple way to do part 1 is assume that the max height will always be same no matter how far the target area is from the starting location on the x axis, then just get the triangle number of the max y value in the target area! Astonishingly simple!
+
+That's not what I did though. I used a beautifully elegant language to solve the problem in a very unimaginative way. 
+```haskell
+stepVelocity :: V2 Int -> V2 Int
+stepVelocity (V2 x y)
+  | x == 0 = V2 x (y - 1)
+  | x > 0 = V2 (x - 1) (y - 1)
+  | otherwise = V2 (x + 1) (y - 1)
+```
+This is how the probe moves. Y is constantly decreasing using triangle numbers. X is decreasing towards 0 then stopping.
+
+We need to be able to tell if the probe is in the target area, or indeed passed the target area completely:
+```haskell
+inTargetArea :: Point -> TargetArea -> Bool
+inTargetArea (V2 x y) (V2 xmin ymin, V2 xmax ymax) = inX x && inY y
+  where
+    inX val = allPred [(>= xmin), (<= xmax)] val
+    inY val = allPred [(>= ymin), (<= ymax)] val
+
+passedTargetArea :: Point -> TargetArea -> Bool
+passedTargetArea (V2 x y) (V2 xmin ymin, V2 xmax ymax) = passedX x || passedY y
+  where
+    passedX val = val > xmax
+    passedY val = val < ymin
+```
+
+Finally, we need to be able to get the list of points hit from a single starting point, by adding the velocity to that point until we're in or passed the target area. What does that sound like? An `unfold`!
+```haskell
+type Velocity = V2 Int
+
+type ProbeState = (Point, Velocity)
+
+fireProbe' :: Velocity -> TargetArea -> [Point]
+fireProbe' vel targetArea = unfoldr go (V2 0 0, vel)
+  where
+    go :: ProbeState -> Maybe (Point, ProbeState)
+    go (current, vel@(V2 xVel yVel))
+      | passedTargetArea current targetArea = Nothing
+      | inTargetArea current targetArea = Nothing
+      | otherwise = Just (nextPoint, next)
+      where
+        next@(nextPoint, _) = (current + vel, stepVelocity vel)
+```
+The issue with this is that we get a list of points (yay!) but we need to interrogate the final point in the list to figure out if we succeeded in hitting the target area. Not ideal, especially considering we've already done that calculation to figure out if we should stop the `unfold` operation. What we can do instead is embed the notion of failure in the the unfold itself, by using `unfoldrM` with the `Maybe` monad. That way, if we hit the target area we get our list of points, but if we didn't then we just get a big 'ol `Nothing`. Like so:
+```haskell
+fireProbe :: Velocity -> TargetArea -> Maybe [Point]
+fireProbe vel targetArea = unfoldrM go (V2 0 0, vel)
+  where
+    go :: ProbeState -> Maybe (Maybe (Point, ProbeState))
+    go (current, vel@(V2 xVel yVel))
+      | passedTargetArea current targetArea = Nothing
+      | inTargetArea current targetArea = pure Nothing
+      | otherwise = pure $ Just (nextPoint, next)
+      where
+        next@(nextPoint, _) = (current + vel, stepVelocity vel)
+```
+Now `fireProbe` will only be a `Just` if we actually hit the target area. Finally, we can use `mapMaybe` to get only the `Just` values out of our possible trajectories, and ignore the `Nothing` values.
+```haskell
+vectorRange :: TargetArea -> [[V2 Int]]
+vectorRange ta@(V2 xmin ymin, V2 xmax ymax) = mapMaybe (`fireProbe` ta) vRange
+  where
+    xRange = filter (\x -> triangleX x >= xmin) [1 .. xmax] --if the corresponding triangle number is not big enough, then our probe will never get far enough
+    yRange = [ymin .. abs ymin]
+    vRange = [V2 x y | x <- xRange, y <- yRange]
+```
+Nice to have a break in the difficulty curve! I think this puzzle was easier than the other ones.
