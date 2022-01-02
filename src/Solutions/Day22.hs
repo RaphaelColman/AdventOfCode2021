@@ -6,7 +6,7 @@ import qualified Common.SetUtils     as SU
 import           Control.Applicative (Alternative (some), (<|>))
 import           Control.Lens        ((&))
 import           Data.List           (foldl')
-import           Data.Maybe          (fromJust, mapMaybe)
+import           Data.Maybe          (fromJust, isJust, mapMaybe)
 import qualified Data.Set            as S
 import           Linear              (V3 (V3))
 import           Text.Trifecta       (CharParsing (anyChar, char, string),
@@ -53,36 +53,14 @@ parseInstruction = do
       [min, max] <- integer `sepBy` symbol ".."
       pure (min, max)
 
-part1 :: [Instruction] -> Int
-part1 = length . runInstructions . map transformInstruction
+part1 :: [Instruction] -> Integer
+part1 instructions = runReboot filtered
+  where
+    filtered = filter (isJust . intersection target . _cuboid) instructions
+    target = MkCuboid (-50, 50) (-50, 50) (-50, 50)
 
 part2 :: [Instruction] -> Integer
 part2 = runReboot
-
-runInstructions :: [Instruction] -> S.Set Point
-runInstructions = foldl' go S.empty
-  where
-    go :: S.Set Point -> Instruction -> S.Set Point
-    go points (MkInstruction on cuboid)
-      | on = S.union points $ enclosedPoints cuboid
-      | otherwise = points S.\\ enclosedPoints cuboid
-
-enclosedPoints :: Cuboid -> S.Set Point
-enclosedPoints (MkCuboid (x1, x2) (y1, y2) (z1, z2)) =
-  S.fromList [V3 x y z | x <- [x1 .. x2], y <- [y1 .. y2], z <- [z1 .. z2]]
-
-transformInstruction :: Instruction -> Instruction
-transformInstruction (MkInstruction on (MkCuboid (x1, x2) (y1, y2) (z1, z2))) =
-  MkInstruction on $ MkCuboid (newX1, newX2) (newY1, newY2) (newZ1, newZ2)
-  where
-    [newX1, newY1, newZ1] = map swapLower [x1, y1, z1]
-    [newX2, newY2, newZ2] = map swapHigher [x2, y2, z2]
-    swapLower n
-      | n <= (-50) = -50
-      | otherwise = n
-    swapHigher n
-      | n >= 50 = 50
-      | otherwise = n
 
 area :: Cuboid -> Integer
 area (MkCuboid (x1, x2) (y1, y2) (z1, z2)) = xLength * yLength * zLength
