@@ -37,6 +37,7 @@ library
       Common.MathUtils
       Common.MaybeUtils
       Common.Predicates
+      Common.SetUtils
       Lib
       Solutions.Day1
       Solutions.Day10

@@ -1,21 +1,129 @@
-module Solutions.Day22
-  ( aoc22
-  ) where
+module Solutions.Day22 where
 
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
-                                      printSolutions)
-import           Text.Trifecta       (Parser)
+                                      printSolutions, printTestSolutions)
+import qualified Common.SetUtils     as SU
+import           Control.Applicative (Alternative (some), (<|>))
+import           Control.Lens        ((&))
+import           Data.List           (foldl')
+import           Data.Maybe          (fromJust, mapMaybe)
+import qualified Data.Set            as S
+import           Linear              (V3 (V3))
+import           Text.Trifecta       (CharParsing (anyChar, char, string),
+                                      Parser, Parsing (try), commaSep, integer,
+                                      sepBy, symbol, whiteSpace)
 
 aoc22 :: IO ()
 aoc22 = do
   printSolutions 22 $ MkAoCSolution parseInput part1
   printSolutions 22 $ MkAoCSolution parseInput part2
 
-parseInput :: Parser String
-parseInput = undefined
+type Point = V3 Integer
 
-part1 :: String -> String
-part1 = undefined
+type PointRange = (Integer, Integer)
 
-part2 :: String -> String
-part2 = undefined
+data Instruction =
+  MkInstruction
+    { _on     :: Bool
+    , _cuboid :: Cuboid
+    }
+  deriving (Eq, Show, Ord)
+
+data Cuboid =
+  MkCuboid
+    { _xRange :: PointRange
+    , _yRange :: PointRange
+    , _zRange :: PointRange
+    }
+  deriving (Eq, Show, Ord)
+
+parseInput :: Parser [Instruction]
+parseInput = some parseInstruction
+
+parseInstruction :: Parser Instruction
+parseInstruction = do
+  switch <- (== "on") <$> (try (string "on") <|> try (string "off"))
+  whiteSpace
+  [xRange, yRange, zRange] <- commaSep parseRange
+  pure $ MkInstruction switch $ MkCuboid xRange yRange zRange
+  where
+    parseRange :: Parser PointRange
+    parseRange = do
+      anyChar >> char '='
+      [min, max] <- integer `sepBy` symbol ".."
+      pure (min, max)
+
+part1 :: [Instruction] -> Int
+part1 = length . runInstructions . map transformInstruction
+
+part2 :: [Instruction] -> Integer
+part2 = runReboot
+
+runInstructions :: [Instruction] -> S.Set Point
+runInstructions = foldl' go S.empty
+  where
+    go :: S.Set Point -> Instruction -> S.Set Point
+    go points (MkInstruction on cuboid)
+      | on = S.union points $ enclosedPoints cuboid
+      | otherwise = points S.\\ enclosedPoints cuboid
+
+enclosedPoints :: Cuboid -> S.Set Point
+enclosedPoints (MkCuboid (x1, x2) (y1, y2) (z1, z2)) =
+  S.fromList [V3 x y z | x <- [x1 .. x2], y <- [y1 .. y2], z <- [z1 .. z2]]
+
+transformInstruction :: Instruction -> Instruction
+transformInstruction (MkInstruction on (MkCuboid (x1, x2) (y1, y2) (z1, z2))) =
+  MkInstruction on $ MkCuboid (newX1, newX2) (newY1, newY2) (newZ1, newZ2)
+  where
+    [newX1, newY1, newZ1] = map swapLower [x1, y1, z1]
+    [newX2, newY2, newZ2] = map swapHigher [x2, y2, z2]
+    swapLower n
+      | n <= (-50) = -50
+      | otherwise = n
+    swapHigher n
+      | n >= 50 = 50
+      | otherwise = n
+
+area :: Cuboid -> Integer
+area (MkCuboid (x1, x2) (y1, y2) (z1, z2)) = xLength * yLength * zLength
+  where
+    xLength = abs (x1 - x2) + 1
+    yLength = abs (y1 - y2) + 1
+    zLength = abs (z1 - z2) + 1
+
+intersection :: Cuboid -> Cuboid -> Maybe Cuboid
+intersection (MkCuboid (xLeft1, xRight1) (yNear1, yFar1) (zBottom1, zTop1)) (MkCuboid (xLeft2, xRight2) (yNear2, yFar2) (zBottom2, zTop2))
+  | bottom > top = Nothing
+  | left > right = Nothing
+  | near > far = Nothing
+  | otherwise = Just $ MkCuboid (left, right) (near, far) (bottom, top)
+  where
+    bottom = max zBottom1 zBottom2
+    top = min zTop1 zTop2
+    left = max xLeft1 xLeft2
+    right = min xRight1 xRight2
+    near = max yNear1 yNear2
+    far = min yFar1 yFar2
+
+type RebootState = [Instruction]
+
+deriveExtraInstruction :: Instruction -> Instruction -> Maybe Instruction
+deriveExtraInstruction (MkInstruction _ cuboid1) (MkInstruction on cuboid2) =
+  MkInstruction (not on) <$> intersection cuboid1 cuboid2
+
+applyInstruction :: RebootState -> Instruction -> RebootState
+applyInstruction instructions instruction@(MkInstruction on _)
+  | on = instruction : newInstructions ++ instructions
+  | otherwise = instructions ++ newInstructions
+  where
+    newInstructions = mapMaybe (deriveExtraInstruction instruction) instructions
+
+deriveArea :: RebootState -> Integer
+deriveArea = foldr go 0
+  where
+    go (MkInstruction on cuboid) total
+      | on = total + area cuboid
+      | otherwise = total - area cuboid
+
+runReboot :: [Instruction] -> Integer
+runReboot instructions = deriveArea $ foldl' applyInstruction [] instructions
