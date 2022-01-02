@@ -1,16 +1,23 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Solutions.Day21 where
 
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions, printTestSolutions)
-import           Common.ListUtils    (window3, windowN)
+import           Common.ListUtils    (freqs, window3, windowN)
+import           Common.MapUtils     (partitionKeys)
 import           Control.Lens        ((&))
-import           Data.List.Split (chunksOf)
+import           Data.Bifunctor      (first)
+import           Data.Either         (fromLeft, isLeft, partitionEithers)
+import           Data.List           (partition)
+import           Data.List.Split     (chunksOf)
+import qualified Data.Map            as M
 import           Text.Trifecta       (CharParsing (string), Parser, integer)
 
 aoc21 :: IO ()
 aoc21 = do
   printSolutions 21 $ MkAoCSolution parseInput part1
-  --printSolutions 21 $ MkAoCSolution parseInput part2
+  printSolutions 21 $ MkAoCSolution parseInput part2
 
 type Players = (Integer, Integer)
 
@@ -19,7 +26,7 @@ data Player =
     { _value :: Integer
     , _score :: Integer
     }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 data Game =
   MkGame
@@ -46,13 +53,11 @@ parseInput = do
   player2 <- string "Player 2 starting position: " >> integer
   pure (player1, player2)
 
---part1 :: String -> String
-part1 players = play game
-  where game = initGame players
-        finGame = iterate step game !! 331
+part1 :: Players -> Integer
+part1 = play . initGame
 
---part2 :: String -> String
-part2 = undefined
+part2 :: Players -> Integer
+part2 = playDiracGame . initDiracGame
 
 play :: Game -> Integer
 play game =
@@ -73,8 +78,81 @@ loser (MkGame (MkPlayer _ score1) (MkPlayer _ score2) _ numRolls)
   | otherwise = Nothing
 
 incrementValue :: Integer -> Integer -> Integer
-incrementValue score amount =
-  let total = (score + amount) `mod` 10
+incrementValue value amount =
+  let total = (value + amount) `mod` 10
    in if total == 0
         then 10
         else total
+
+diracDiceRolls :: M.Map Integer Integer
+diracDiceRolls = freqs combos
+  where
+    combos = [sum [x, y, z] | x <- [1 .. 3], y <- [1 .. 3], z <- [1 .. 3]]
+
+data Universe =
+  MkU
+    { _dPlayer1 :: Player
+    , _dPlayer2 :: Player
+    }
+  deriving (Eq, Show, Ord)
+
+data DiracGame =
+  MkDG
+    { _universes   :: Universes
+    , _firstPlayer :: Bool
+    , _player1Wins :: Integer
+    , _player2Wins :: Integer
+    }
+  deriving (Eq, Show)
+
+type Universes = M.Map Universe Integer
+
+data Winner
+  = PLAYER1
+  | PLAYER2
+  deriving (Eq, Show, Ord)
+
+playDiracGame :: DiracGame -> Integer
+playDiracGame game@(MkDG universes _ p1W p2W)
+  | null universes = max p1W p2W
+  | otherwise = diracTurn game & playDiracGame
+
+diracTurn :: DiracGame -> DiracGame
+diracTurn (MkDG universes firstPlayer player1Wins player2Wins) =
+  MkDG remaining (not firstPlayer) newP1Wins newP2Wins
+  where
+    newUniverses = M.foldrWithKey go M.empty universes
+    go :: Universe -> Integer -> Universes -> Universes
+    go universe count universes =
+      let newUniverses = splitUniverse firstPlayer universe count
+       in M.unionWith (+) newUniverses universes
+    (finished, remaining) = partitionKeys partitionFinished (+) newUniverses
+    newP1Wins = M.findWithDefault 0 PLAYER1 finished + player1Wins
+    newP2Wins = M.findWithDefault 0 PLAYER2 finished + player2Wins
+
+partitionFinished :: Universe -> Either Winner Universe
+partitionFinished universe@(MkU (MkPlayer _ score1) (MkPlayer _ score2))
+  | score1 >= 21 = Left PLAYER1
+  | score2 >= 21 = Left PLAYER2
+  | otherwise = Right universe
+
+splitUniverse :: Bool -> Universe -> Integer -> Universes
+splitUniverse isPlayer1 (MkU player1 player2) count =
+  M.map (* count) $ M.mapKeys go diracDiceRolls
+  where
+    go value =
+      if isPlayer1
+        then MkU (newPlayer value player1) player2
+        else MkU player1 (newPlayer value player2)
+
+newPlayer :: Integer -> Player -> Player
+newPlayer value player =
+  let newValue = incrementValue (_value player) value
+      newScore = _score player + newValue
+   in MkPlayer newValue newScore
+
+initDiracGame :: Players -> DiracGame
+initDiracGame (p1, p2) = MkDG (M.fromList [(initialUniverse, 1)]) True 0 0
+  where
+    [player1, player2] = map (`MkPlayer` 0) [p1, p2]
+    initialUniverse = MkU player1 player2
