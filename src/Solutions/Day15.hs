@@ -8,6 +8,7 @@ import           Common.Debugging    (traceLns, traceVectorMap)
 import           Common.Geometry     (Grid, Point, allOrthogonalNeighbours,
                                       enumerateMultilineStringToVectorMap,
                                       gridOrthogonalNeighbours, renderVectorMap)
+import           Common.MapUtils
 import           Data.Char           (digitToInt)
 import           Data.Foldable       (maximumBy, minimum, minimumBy)
 import           Data.Function       (on)
@@ -60,9 +61,6 @@ bottomRight grid = maximumBy compareFun $ M.keysSet grid
       case compare x1 x2 of
         EQ     -> compare y1 y2
         result -> result
-
-minimumValue :: (Ord a) => M.Map k a -> (k, a)
-minimumValue = minimumBy (compare `on` snd) . M.toList
 
 unfoldGrid :: Grid Int -> Grid Int
 unfoldGrid grid = ($!) M.unions [grid, verticals]

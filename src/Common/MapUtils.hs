@@ -1,7 +1,9 @@
 module Common.MapUtils where
 
-import           Data.Either (partitionEithers)
-import qualified Data.Map    as M
+import           Data.Either   (partitionEithers)
+import           Data.Foldable (minimumBy)
+import           Data.Function (on)
+import qualified Data.Map      as M
 
 mapIf :: (a -> Bool) -> (a -> a) -> M.Map k a -> M.Map k a
 mapIf condition f =
@@ -27,3 +29,6 @@ partitionKeys f combining map' =
            let e = f k
             in either (\x -> Left (x, a)) (\x -> Right (x, a)) e) $
       M.toList map'
+
+minimumValue :: (Ord a) => M.Map k a -> (k, a)
+minimumValue = minimumBy (compare `on` snd) . M.toList
