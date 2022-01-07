@@ -1,4 +1,6 @@
-module Solutions.Day22 where
+module Solutions.Day22
+  ( aoc22
+  ) where
 
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions, printTestSolutions)

@@ -1,9 +1,12 @@
-module Solutions.Day12 where
+module Solutions.Day12
+  ( aoc12
+  ) where
 
 import           Combinatorics       (tuples)
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions, printTestSolutions)
 import           Common.FunctorUtils (fmap2)
+import           Common.ListUtils    (allSets)
 import           Control.Applicative (Alternative (some), liftA3)
 import qualified Data.Map            as M
 import qualified Data.Set            as S
@@ -12,7 +15,6 @@ import           GHC.Unicode         (isLower, isUpper)
 import           Text.Trifecta       (CharParsing (char), Parser,
                                       TokenParsing (token), letter, newline,
                                       some)
-import Common.ListUtils (allSets)
 
 aoc12 :: IO ()
 aoc12 = do
