@@ -2,7 +2,7 @@ module Solutions.Day5 where
 
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions, printTestSolutions)
-import           Common.ListUtils    (freqs)
+import           Common.ListUtils    (freqs, flexibleRange)
 import           Common.Predicates   (anyPred)
 import           Control.Lens        ((^.))
 import           Data.List           (groupBy)
@@ -64,8 +64,3 @@ isHorizontal (v1, v2) = v1 ^. _y == v2 ^. _y
 
 isVertical :: Line -> Bool
 isVertical (v1, v2) = v1 ^. _x == v2 ^. _x
-
-flexibleRange :: Integer -> Integer -> [Integer]
-flexibleRange a b
-  | b >= a = [a .. b]
-  | otherwise = [a,(a - 1) .. b]

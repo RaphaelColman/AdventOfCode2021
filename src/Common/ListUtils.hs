@@ -35,3 +35,8 @@ allSets xs = gen
 
 singleton :: a -> [a]
 singleton x = [x]
+
+flexibleRange :: Integer -> Integer -> [Integer]
+flexibleRange a b
+  | b >= a = [a .. b]
+  | otherwise = [a,(a - 1) .. b]

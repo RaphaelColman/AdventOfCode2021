@@ -6,11 +6,11 @@ import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions)
 import           Common.Debugging
 import           Common.Geometry     (Point)
-import           Common.ListUtils    (singleton, window3)
+import           Common.ListUtils    (flexibleRange, singleton, window3)
 import           Control.Lens
 import           Data.Foldable       (find)
 import qualified Data.Map            as M
-import           Data.Maybe          (isJust, isNothing)
+import           Data.Maybe          (isJust, isNothing, mapMaybe)
 import qualified Data.Set            as S
 import           Linear              (V2 (V2))
 import           Text.Trifecta       (Parser)
@@ -29,16 +29,11 @@ data AmType
 
 type Burrow = M.Map BurrowSpace (S.Set BurrowSpace)
 
-data Amphipod
-  = MkApod
-      { _position :: BurrowSpace
-      , _amType   :: AmType
-      }
-  | MovingAmphipod
-      { _position    :: BurrowSpace
-      , _amType      :: AmType
-      , _movingState :: MovingState
-      }
+data Amphipod =
+  MkApod
+    { _position :: BurrowSpace
+    , _amType   :: AmType
+    }
   deriving (Eq, Show, Ord)
 
 data MovingState
@@ -49,10 +44,7 @@ data MovingState
 data BurrowState =
   MkBS
     { _theBurrow :: Burrow
-    , _initial   :: [Amphipod] --Haven't moved yet
-    , _stopped   :: [Amphipod] --Stopped in the corrider. These MUST move to a room next time the move
-    , _finished  :: [Amphipod] --No need to move them anymore
-    , _moving    :: Maybe (MovingState, Amphipod)
+    , _aPods     :: [Amphipod]
     }
   deriving (Eq, Show, Ord)
 
@@ -72,13 +64,13 @@ parseInput = pure burrow
 part1 burrow = traceVectorMap (renderBurrowState bs) finished
   where
     bs = initBurrowState
-    finished = filter (`isFinished` bs) $ allAmphipods bs
+    finished = filter (`isFinished` bs) $ bs ^. aPods
 
 part2 :: String -> String
 part2 = undefined
 
 initBurrowState :: BurrowState
-initBurrowState = MkBS burrow amphipods [] [] Nothing
+initBurrowState = MkBS burrow amphipods
   where
     amphipods = zipWith MkApod rooms podTypes
     podTypes = [B, A, C, D, B, C, D, A]
@@ -99,25 +91,6 @@ inCorridor (MkApod position _) =
     CorridorSpace _ -> True
     Room at _       -> False
 
-possibleNextStatesForMoving ::
-     BurrowState -> MovingState -> Amphipod -> [BurrowState]
-possibleNextStatesForMoving bs@(MkBS burrow initial stopped finished moving) mState aPod@(MkApod position aType) =
-  case mState of
-    RoomToCorridor -> undefined
-    CorridorToRoom -> undefined
-  where
-    newMovedStates =
-      S.toList $
-      S.map move $
-      S.filter (\space -> not $ occupied space bs) $
-      possibleAdjacentPositions aPod bs
-    move newPos =
-      MkBS burrow initial stopped finished (Just (mState, MkApod newPos aType))
-    stoppedState =
-      [ MkBS burrow initial (aPod : stopped) finished Nothing
-      | not (isOutsideRoom position)
-      ]
-
 possibleAdjacentPositions :: Amphipod -> BurrowState -> S.Set BurrowSpace
 possibleAdjacentPositions (MkApod position amType) bs =
   S.filter (\space -> isNothing (getOccupant space bs)) $
@@ -128,7 +101,7 @@ occupied bSpace bState = isJust $ getOccupant bSpace bState
 
 getOccupant :: BurrowSpace -> BurrowState -> Maybe Amphipod
 getOccupant bSpace bState =
-  find (\(MkApod space aType) -> space == bSpace) $ allAmphipods bState
+  find (\(MkApod space aType) -> space == bSpace) $ bState ^. aPods
 
 isRoom :: BurrowSpace -> Bool
 isRoom (CorridorSpace _) = False
@@ -138,6 +111,49 @@ isOutsideRoom :: BurrowSpace -> Bool
 isOutsideRoom (CorridorSpace i) = i `elem` [2, 4, 6, 8]
 isOutsideRoom (Room _ _)        = False
 
+destinationRoomSpace :: Amphipod -> BurrowState -> Maybe BurrowSpace
+destinationRoomSpace (MkApod pos aType) bs
+  | any (\(MkApod _ destType) -> destType /= aType) destinationOccupants =
+    Nothing --Can't go this room because it has amphipods of the wrong type
+  | null destinationOccupants = Just $ Room aType 2
+  | length destinationOccupants == 1 = Just $ Room aType 1
+  | length destinationOccupants == 2 = Nothing --This room is already complete
+  | otherwise = error "More than two occupants for only two rooms"
+  where
+    destinationOccupants = mapMaybe ((`getOccupant` bs) . Room aType) [1, 2]
+
+--Route from start node to end node (including start and end ndoes)
+route :: BurrowSpace -> BurrowSpace -> [BurrowSpace]
+route (Room aType rNum) (CorridorSpace cNum) = roomStep ++ corridorSteps
+  where
+    corridorSteps =
+      map CorridorSpace $ flexibleRange (aTypeToCorridorNum aType) cNum
+    roomStep = map (Room aType) $ flexibleRange rNum 1
+route (CorridorSpace cNum) (Room aType rNum) = corridorSteps ++ roomStep
+  where
+    corridorSteps =
+      map CorridorSpace $ flexibleRange cNum (aTypeToCorridorNum aType)
+    roomStep = map (Room aType) $ [1 .. rNum]
+route (Room aType1 rNum1) (Room aType2 rNum2) =
+  roomStepOut ++ corridorSteps ++ roomStepIn
+  where
+    corridorSteps =
+      map CorridorSpace $
+      flexibleRange (aTypeToCorridorNum aType1) (aTypeToCorridorNum aType2)
+    roomStepOut = map (Room aType1) $ flexibleRange rNum1 1
+    roomStepIn = map (Room aType2) [1 .. rNum2]
+route (CorridorSpace _) (CorridorSpace _) =
+  error "Should not be moving from one corridor space to another"
+
+aTypeToCorridorNum :: AmType -> Integer
+aTypeToCorridorNum aType =
+  case aType of
+    A -> 2
+    B -> 4
+    C -> 6
+    D -> 8
+
+--Creating the burrow graph
 burrow :: Burrow
 burrow = M.union corridorSpaces rooms
 
@@ -184,30 +200,26 @@ renderBurrow = M.union corridorAndRooms entireGrid
       M.fromList $ zip [V2 x y | x <- [0 .. 12], y <- [0 .. 4]] $ repeat '#'
 
 renderBurrowState :: BurrowState -> M.Map Point Char
-renderBurrowState bs = M.union aPods renderBurrow
+renderBurrowState bs = M.union allApods renderBurrow
   where
-    aPods =
+    allApods =
       M.fromList $
       map (\(MkApod space aType) -> (spaceToPoint space, amTypeToChar aType)) $
-      allAmphipods bs
-
-allAmphipods :: BurrowState -> [Amphipod]
-allAmphipods (MkBS _ i s f m) =
-  case m of
-    Nothing            -> i ++ s ++ f
-    Just (_, amphipod) -> amphipod : (i ++ s ++ f)
+      bs ^. aPods
 
 spaceToPoint :: BurrowSpace -> Point
 spaceToPoint (CorridorSpace i) = V2 (fromInteger i) 1
 spaceToPoint (Room amType i) = V2 x $ fromInteger (i + 1)
   where
-    x =
-      fromInteger $
-      case amType of
-        A -> 3
-        B -> 5
-        C -> 7
-        D -> 9
+    x = fromInteger $ aTypeToX amType
+
+aTypeToX :: AmType -> Integer
+aTypeToX aType =
+  case aType of
+    A -> 3
+    B -> 5
+    C -> 7
+    D -> 9
 
 amTypeToChar :: AmType -> Char
 amTypeToChar aType =
@@ -217,19 +229,9 @@ amTypeToChar aType =
     C -> 'C'
     D -> 'D'
 
--- Possible implementation where you calculate the shortest path from room to corridor and corridor to room...
-possibleDestinations :: Amphipod -> BurrowState -> S.Set BurrowSpace
-possibleDestinations apod@(MkApod position amType) bs
-  | isFinished apod bs = S.empty
-  | inCorridor apod = undefined
-  | otherwise = undefined
-
-path :: Burrow -> BurrowSpace -> BurrowSpace -> [BurrowSpace]
-path burrow start finish = go start finish 0 S.empty
+testBurrow :: BurrowState
+testBurrow = MkBS burrow newPods
   where
-    go start' finish' units visited
-      | start' == finish' = [finish]
-      | otherwise = undefined
-      where
-        children = burrow M.! start
-        visitChild child = go child finish' (units + 1) (S.singleton start')
+    (MkBS burrow pods) = initBurrowState
+    newPods =
+      filter (\(MkApod rm@(Room raType num) aType) -> rm /= (Room A 1)) pods
