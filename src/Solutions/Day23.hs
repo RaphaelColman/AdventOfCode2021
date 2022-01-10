@@ -5,11 +5,13 @@ module Solutions.Day23 where
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions)
 import           Common.Debugging
-import           Common.Geometry     (Point)
+import           Common.Geometry     (Point, renderVectorMap)
 import           Common.ListUtils    (flexibleRange, singleton, window3)
 import           Common.MapUtils     (minimumValue)
+import qualified Common.SetUtils     as SU
 import           Control.Lens
-import           Data.Foldable       (find)
+import           Data.Foldable       (find, minimumBy, traverse_)
+import           Data.Function       (on)
 import qualified Data.Map            as M
 import           Data.Maybe          (isJust, isNothing, mapMaybe)
 import qualified Data.Set            as S
@@ -43,30 +45,46 @@ data MovingState
   | CorridorToRoom
   deriving (Eq, Show, Enum, Ord)
 
-type BurrowState = [Amphipod]
+type BurrowState = S.Set Amphipod
 
 data Move =
   MkMove
     { _state :: BurrowState
     , _cost  :: Integer
     }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 makeLenses ''Amphipod
 
 aoc23 :: IO ()
-aoc23 = do
+aoc23
+  --let nexts = S.toList $ nextMoves initBurrowState
+  --traverse_ debugLn nexts
+  --print "number of next moves"
+  --print $ length nexts
+  --let nextNode = minimumBy (compare `on` _cost) nexts
+  --print "Lowest cost node:"
+  --debugLn nextNode
+ = do
   printSolutions 23 $ MkAoCSolution parseInput part1
   --printSolutions 23 $ MkAoCSolution parseInput part2
+  where
+    debugLn (MkMove state cost) = do
+      putStrLn $ renderVectorMap $ renderBurrowState state
+      print cost
+
+testBurrow :: BurrowState
+testBurrow = S.fromList amphipods
+  where
+    amphipods = zipWith MkApod rooms podTypes
+    podTypes = [B, A, A, B, C, C, D, D]
+    rooms = zipWith Room [A, A, B, B, C, C, D, D] $ cycle [1, 2]
 
 parseInput :: Parser String
 parseInput = pure "unimplemented"
 
 --part1 :: String -> String
-part1 str = dijkstra bs
-  where
-    bs = initBurrowState
-    nexts = nextMoves bs
+part1 str = dijkstra initBurrowState
 
 part2 :: String -> String
 part2 = undefined
@@ -80,10 +98,11 @@ movementCost aType =
     D -> 1000
 
 initBurrowState :: BurrowState
-initBurrowState = amphipods
+initBurrowState = S.fromList amphipods
   where
     amphipods = zipWith MkApod rooms podTypes
-    podTypes = [B, A, C, D, B, C, D, A]
+    --podTypes = [B, A, C, D, B, C, D, A]
+    podTypes = [D, D, A, C, C, B, A, B]
     rooms = zipWith Room [A, A, B, B, C, C, D, D] $ cycle [1, 2]
 
 burrowComplete :: BurrowState -> Bool
@@ -119,12 +138,14 @@ destinationRoomSpace (MkApod pos aType) bs
   where
     destinationOccupants = mapMaybe ((`getOccupant` bs) . Room aType) [1, 2]
 
-nextMoves :: BurrowState -> [Move]
-nextMoves bs = toRoomMoves ++ allCorridorMoves
+--Maybe this would be quicker if I enumerated all the different moves individually for each amphipod (rather than dividing them into room and corridor moves)
+--Maybe also quicker if I rule out 'blocked amphipods'
+nextMoves :: BurrowState -> S.Set Move
+nextMoves bs = ($!) S.union toRoomMoves allCorridorMoves
   where
-    moveable = filter (not . flip isFinished bs) bs
-    toRoomMoves = mapMaybe (`moveStraightToRoom` bs) moveable
-    allCorridorMoves = concatMap (`corridorMoves` bs) moveable
+    moveable = S.filter (not . flip isFinished bs) bs
+    toRoomMoves = SU.mapMaybe (`moveStraightToRoom` bs) moveable
+    allCorridorMoves = S.fromList $ concatMap (`corridorMoves` bs) moveable
 
 moveStraightToRoom :: Amphipod -> BurrowState -> Maybe Move
 moveStraightToRoom aPod@(MkApod pos aType) bs = do
@@ -133,7 +154,7 @@ moveStraightToRoom aPod@(MkApod pos aType) bs = do
   let pathIsClear = not $ any (`occupied` bs) path
   newState <-
     if pathIsClear
-      then pure $ MkApod ds aType : filter (/= aPod) bs --Move the Apod to its destination
+      then pure $ S.insert (MkApod ds aType) $ S.filter (/= aPod) bs --Move the Apod to its destination
       else Nothing
   let cost = toInteger (length path) * movementCost aType
   pure $ MkMove newState cost
@@ -146,34 +167,34 @@ corridorMoves aPod@(MkApod pos@(Room rType rNum) aType) bs =
       let path = tail $ route pos cSpace
           pathIsClear = not $ any (`occupied` bs) path
           cost = toInteger (length path) * movementCost aType
-          newState = MkApod cSpace aType : filter (/= aPod) bs
+          newState = S.insert (MkApod cSpace aType) $ S.filter (/= aPod) bs
        in if pathIsClear
             then Just (MkMove newState cost)
             else Nothing
 corridorMoves _ _ = []
 
---This doesn't work because it checks BurrowState for equality and BurrowState is a list (so the order matters)
+--Slows down well before it will get to the solution. Might be from comparing all those sets?
 dijkstra :: BurrowState -> Integer
 dijkstra bs = go bs (M.fromList [(bs, 0)]) S.empty
   where
     go current tDistances visited
       | burrowComplete current = tDistances M.! current
-      | otherwise = traceShow (length newVisited) ($!) go minNode newTDistances newVisited
+      | otherwise = ($!) go minNode newTDistances newVisited
       where
         unvisitedChildren =
-          filter (\(MkMove state cost) -> not (state `S.member` visited)) $
+          S.filter (\(MkMove state cost) -> not (state `S.member` visited)) $
           nextMoves current
         distances =
-          M.fromList $
-          map
-            (\(MkMove state cost) -> (state, cost + tDistances M.! current))
+          M.mapKeys _state $
+          M.fromSet
+            (\(MkMove state cost) -> cost + tDistances M.! current)
             unvisitedChildren
         newTDistances = M.unionWith min distances tDistances
-        newVisited = S.insert current visited
-        (minNode, _) =
+        (minNode, minEnergy) =
           minimumValue $
-          M.filterWithKey (\k v -> not (k `S.member` visited)) newTDistances
-        candidates = M.filterWithKey (\k v -> not (k `S.member` visited)) newTDistances --Put this in for logging. What do you do in Dikstra's algorithm if all of the members of tDistances have been visited? This might be why you need the other nodes in there with infinity as the value
+          M.filterWithKey (\k v -> k `S.notMember` newVisited) newTDistances --According the profile, this is the most expensive bit.  Could it be that `minimumValue`  turns it into a list of tuples?
+        newVisited = S.insert current visited
+--The trace is defo centered around the S.notMember bit, so not sure it's to do with minimumValue
 
 --Route from start node to end node (including start and end ndoes)
 --This probably does not have to be in order and can be simplified
@@ -224,7 +245,10 @@ renderBurrowState bs = M.union allApods renderBurrow
   where
     allApods =
       M.fromList $
-      map (\(MkApod space aType) -> (spaceToPoint space, amTypeToChar aType)) bs
+      S.toList $ --Use S.fromKeySet with a function?
+      S.map
+        (\(MkApod space aType) -> (spaceToPoint space, amTypeToChar aType))
+        bs
 
 spaceToPoint :: BurrowSpace -> Point
 spaceToPoint (CorridorSpace i) = V2 (fromInteger i + 1) 1
@@ -247,3 +271,15 @@ amTypeToChar aType =
     B -> 'B'
     C -> 'C'
     D -> 'D'
+
+showBurrowState :: BurrowState -> IO ()
+showBurrowState = putStrLn . renderVectorMap . renderBurrowState
+
+showMove :: Move -> IO ()
+showMove (MkMove state cost) = do
+  showBurrowState state
+  print cost
+
+showMoves :: S.Set Move -> IO ()
+showMoves moves = do
+  traverse_ showMove moves
