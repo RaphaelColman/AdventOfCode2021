@@ -14,6 +14,7 @@ import           Data.Foldable       (find, minimumBy, traverse_)
 import           Data.Function       (on)
 import qualified Data.Map            as M
 import           Data.Maybe          (isJust, isNothing, mapMaybe)
+import qualified Data.PSQueue        as PQ
 import qualified Data.Set            as S
 import           Debug.Trace
 import           Linear              (V2 (V2))
@@ -84,7 +85,7 @@ parseInput :: Parser String
 parseInput = pure "unimplemented"
 
 --part1 :: String -> String
-part1 str = dijkstra initBurrowState
+part1 str = dijkstraPQ initBurrowState
 
 part2 :: String -> String
 part2 = undefined
@@ -192,9 +193,39 @@ dijkstra bs = go bs (M.fromList [(bs, 0)]) S.empty
         newTDistances = M.unionWith min distances tDistances
         (minNode, minEnergy) =
           minimumValue $
-          M.filterWithKey (\k v -> k `S.notMember` newVisited) newTDistances --According the profile, this is the most expensive bit.  Could it be that `minimumValue`  turns it into a list of tuples?
+          M.withoutKeys newTDistances newVisited --According the profile, this is the most expensive bit.  Could it be that `minimumValue`  turns it into a list of tuples?
         newVisited = S.insert current visited
+
 --The trace is defo centered around the S.notMember bit, so not sure it's to do with minimumValue
+-- Maybe can do this with a priority queue. So we track tentative distances separately to the queue of next node to pick up.
+--This implementation looks great: https://hackage.haskell.org/package/PSQueue-1.1.0.1/docs/Data-PSQueue.html
+
+--I'm sure I'm missing the bit where you add the childCost to the current cost...
+dijkstraPQ :: BurrowState -> Maybe Integer
+dijkstraPQ bs = go (PQ.singleton bs 0) M.empty S.empty
+  where
+    go pq costs visited = do
+      (current PQ.:-> cost, remainingQueue) <- PQ.minView pq
+      let isLowerCost = maybe True (> cost) $ M.lookup current costs
+      if burrowComplete current
+        then pure cost
+        else do
+          if current `S.notMember` visited && isLowerCost
+            then do
+              let newVisited = S.insert current visited
+              let newCosts = M.insert current cost costs
+              let unvisitedChildren =
+                    S.filter
+                      (\(MkMove state cost) -> state `S.notMember` visited) $
+                    nextMoves current
+              let newPQ =
+                    S.fold
+                      (\(MkMove state' cost') pq' ->
+                         PQ.insertWith min state' (cost' + cost) pq')
+                      pq
+                      unvisitedChildren
+              ($!) go newPQ newCosts newVisited
+            else ($!) go remainingQueue costs visited
 
 --Route from start node to end node (including start and end ndoes)
 --This probably does not have to be in order and can be simplified

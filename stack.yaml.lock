@@ -18,6 +18,13 @@ packages:
       sha256: a3d23f56cc2a9d17ed24ac5119a7b2102d40c0afeed5271f6b41b7597f181df0
   original:
     hackage: parsec3-numbers-0.1.0
+- completed:
+    hackage: PSQueue-1.1.0.1@sha256:498cd3d55e4644afbeaeb4d1df63392cd95826991465099395abb7d0c3ce3e58,1318
+    pantry-tree:
+      size: 214
+      sha256: 20f22262b113ba31601dcdd2c29315f70365ab298f1ddb3a6fb2c6d8cfb07b2a
+  original:
+    hackage: PSQueue-1.1.0.1@sha256:498cd3d55e4644afbeaeb4d1df63392cd95826991465099395abb7d0c3ce3e58,1318
 snapshots:
 - completed:
     size: 586296

@@ -70,7 +70,8 @@ library
   hs-source-dirs:
       src
   build-depends:
-      advent-of-code-api >=0.2.8
+      PSQueue
+    , advent-of-code-api >=0.2.8
     , base >=4.7 && <5
     , combinatorial
     , containers
@@ -99,6 +100,7 @@ executable AdventOfCode2021-exe
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       AdventOfCode2021
+    , PSQueue
     , advent-of-code-api >=0.2.8
     , base >=4.7 && <5
     , combinatorial
@@ -129,6 +131,7 @@ test-suite AdventOfCode2021-test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       AdventOfCode2021
+    , PSQueue
     , advent-of-code-api >=0.2.8
     , base >=4.7 && <5
     , combinatorial

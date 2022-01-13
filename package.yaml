@@ -38,6 +38,7 @@ dependencies:
 - finite-typelits
 - monad-loops
 - monad-extras
+- PSQueue
 
 library:
   source-dirs: src
