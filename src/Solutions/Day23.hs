@@ -59,36 +59,30 @@ makeLenses ''Amphipod
 
 aoc23 :: IO ()
 aoc23
-  --let nexts = S.toList $ nextMoves initBurrowState
-  --traverse_ debugLn nexts
-  --print "number of next moves"
-  --print $ length nexts
-  --let nextNode = minimumBy (compare `on` _cost) nexts
-  --print "Lowest cost node:"
-  --debugLn nextNode
  = do
-  printSolutions 23 $ MkAoCSolution parseInput part1
-  --printSolutions 23 $ MkAoCSolution parseInput part2
+  --printSolutions 23 $ MkAoCSolution parseInput part1
+  printSolutions 23 $ MkAoCSolution parseInput part2
   where
     debugLn (MkMove state cost) = do
       putStrLn $ renderVectorMap $ renderBurrowState state
       print cost
 
-testBurrow :: BurrowState
-testBurrow = S.fromList amphipods
-  where
-    amphipods = zipWith MkApod rooms podTypes
-    podTypes = [B, A, A, B, C, C, D, D]
-    rooms = zipWith Room [A, A, B, B, C, C, D, D] $ cycle [1, 2]
-
 parseInput :: Parser String
 parseInput = pure "unimplemented"
 
---part1 :: String -> String
-part1 str = dijkstraPQ initBurrowState
+part1 str = dijkstraPQ initBurrowState1
 
-part2 :: String -> String
-part2 = undefined
+part2 str = dijkstraPQ initBurrowState2
+
+testBurrow :: BurrowState
+testBurrow = S.fromList $ amphipods ++ extraAmphipods
+  where
+    amphipods = zipWith MkApod rooms podTypes
+    extraAmphipods = zipWith MkApod extraRoomSpaces extraPodTypes
+    podTypes = [A, A, B, B, C, C, D, D]
+    extraPodTypes = [A, A, B, B, C, C, D, D]
+    extraRoomSpaces = zipWith Room [A, A, B, B, C, C, D, D] $ cycle [2, 3]
+    rooms = zipWith Room [A, A, B, B, C, C, D, D] $ cycle [1, 4]
 
 movementCost :: AmType -> Integer
 movementCost aType =
@@ -98,25 +92,40 @@ movementCost aType =
     C -> 100
     D -> 1000
 
-initBurrowState :: BurrowState
-initBurrowState = S.fromList amphipods
+initBurrowState1 :: BurrowState
+initBurrowState1 = S.fromList amphipods
   where
     amphipods = zipWith MkApod rooms podTypes
     --podTypes = [B, A, C, D, B, C, D, A]
     podTypes = [D, D, A, C, C, B, A, B]
     rooms = zipWith Room [A, A, B, B, C, C, D, D] $ cycle [1, 2]
 
+initBurrowState2 :: BurrowState
+initBurrowState2 = S.fromList $ amphipods ++ extraAmphipods
+  where
+    amphipods = zipWith MkApod rooms podTypes
+    extraAmphipods = zipWith MkApod extraRoomSpaces extraPodTypes
+    --podTypes = [B, A, C, D, B, C, D, A]
+    podTypes = [D, D, A, C, C, B, A, B]
+    extraPodTypes = [D, D, C, B, B, A, A, C]
+    extraRoomSpaces = zipWith Room [A, A, B, B, C, C, D, D] $ cycle [2, 3]
+    rooms = zipWith Room [A, A, B, B, C, C, D, D] $ cycle [1, 4]
+
 burrowComplete :: BurrowState -> Bool
 burrowComplete bs = all (`isFinished` bs) bs
 
 isFinished :: Amphipod -> BurrowState -> Bool
-isFinished (MkApod position amType) bs
-  | position == Room amType 2 = True -- no need to move if you're in the deepest room of your type
-  | position == Room amType 1 =
-    case getOccupant (Room amType 2) bs of
-      Just a  -> _amType a == amType --Finished if you're in room 1 and room 2 is occupied by an amphipod of the correct type
-      Nothing -> False
-  | otherwise = False
+isFinished (MkApod position amType) bs =
+  case position of
+    CorridorSpace n -> False
+    Room roomType roomDepth ->
+      roomType == amType &&
+      (let otherRoomOccupants = S.filter (inRoomType roomType) bs
+        in all ((== roomType) . _amType) otherRoomOccupants)
+      where inRoomType t (MkApod pos _) =
+              case pos of
+                CorridorSpace n -> False
+                Room at _       -> at == t
 
 occupied :: BurrowSpace -> BurrowState -> Bool
 occupied bSpace bState = isJust $ getOccupant bSpace bState
@@ -132,12 +141,13 @@ destinationRoomSpace :: Amphipod -> BurrowState -> Maybe BurrowSpace
 destinationRoomSpace (MkApod pos aType) bs
   | any (\(MkApod _ destType) -> destType /= aType) destinationOccupants =
     Nothing --Can't go this room because it has amphipods of the wrong type
-  | null destinationOccupants = Just $ Room aType 2
-  | length destinationOccupants == 1 = Just $ Room aType 1
-  | length destinationOccupants == 2 = Nothing --This room is already complete
+  | otherwise =
+    Just $ Room aType (roomDepth - toInteger (length destinationOccupants))
   | otherwise = error "More than two occupants for only two rooms"
   where
-    destinationOccupants = mapMaybe ((`getOccupant` bs) . Room aType) [1, 2]
+    destinationOccupants =
+      mapMaybe ((`getOccupant` bs) . Room aType) [1 .. roomDepth]
+    roomDepth = toInteger $ length $ S.filter ((== aType) . _amType) bs
 
 --Maybe this would be quicker if I enumerated all the different moves individually for each amphipod (rather than dividing them into room and corridor moves)
 --Maybe also quicker if I rule out 'blocked amphipods'
@@ -174,39 +184,17 @@ corridorMoves aPod@(MkApod pos@(Room rType rNum) aType) bs =
             else Nothing
 corridorMoves _ _ = []
 
---Slows down well before it will get to the solution. Might be from comparing all those sets?
-dijkstra :: BurrowState -> Integer
-dijkstra bs = go bs (M.fromList [(bs, 0)]) S.empty
-  where
-    go current tDistances visited
-      | burrowComplete current = tDistances M.! current
-      | otherwise = ($!) go minNode newTDistances newVisited
-      where
-        unvisitedChildren =
-          S.filter (\(MkMove state cost) -> not (state `S.member` visited)) $
-          nextMoves current
-        distances =
-          M.mapKeys _state $
-          M.fromSet
-            (\(MkMove state cost) -> cost + tDistances M.! current)
-            unvisitedChildren
-        newTDistances = M.unionWith min distances tDistances
-        (minNode, minEnergy) =
-          minimumValue $
-          M.withoutKeys newTDistances newVisited --According the profile, this is the most expensive bit.  Could it be that `minimumValue`  turns it into a list of tuples?
-        newVisited = S.insert current visited
-
 --The trace is defo centered around the S.notMember bit, so not sure it's to do with minimumValue
 -- Maybe can do this with a priority queue. So we track tentative distances separately to the queue of next node to pick up.
 --This implementation looks great: https://hackage.haskell.org/package/PSQueue-1.1.0.1/docs/Data-PSQueue.html
-
 --I'm sure I'm missing the bit where you add the childCost to the current cost...
 dijkstraPQ :: BurrowState -> Maybe Integer
 dijkstraPQ bs = go (PQ.singleton bs 0) M.empty S.empty
   where
     go pq costs visited = do
       (current PQ.:-> cost, remainingQueue) <- PQ.minView pq
-      let isLowerCost = maybe True (> cost) $ M.lookup current costs
+      let isLowerCost =
+            traceShow cost $ maybe True (> cost) $ M.lookup current costs
       if burrowComplete current
         then pure cost
         else do
@@ -272,6 +260,7 @@ renderBurrow = M.union corridorAndRooms entireGrid
       M.fromList $ zip [V2 x y | x <- [0 .. 12], y <- [0 .. 4]] $ repeat '#'
 
 renderBurrowState :: BurrowState -> M.Map Point Char
+--renderBurrowState bs = allApods
 renderBurrowState bs = M.union allApods renderBurrow
   where
     allApods =
