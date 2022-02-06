@@ -1,6 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module Solutions.Day23 where
+module Solutions.Day23
+  ( aoc23
+  ) where
 
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions)
@@ -58,9 +60,8 @@ data Move =
 makeLenses ''Amphipod
 
 aoc23 :: IO ()
-aoc23
- = do
-  --printSolutions 23 $ MkAoCSolution parseInput part1
+aoc23 = do
+  printSolutions 23 $ MkAoCSolution parseInput part1
   printSolutions 23 $ MkAoCSolution parseInput part2
   where
     debugLn (MkMove state cost) = do

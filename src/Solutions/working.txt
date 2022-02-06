@@ -1,0 +1,166 @@
+w x y z
+w 0 0 0
+w 0 0 0
+w 0 0 0
+w 0 0 0
+w 10 0 0
+w 0 0 0
+w 1 0 0
+w 1 0 0
+w 1 25 0
+w 1 25 0
+w 1 26 0
+w 1 26 0
+w 1 0 0
+w 1 w 0
+w 1 w+2 0
+w 1 w+2 0
+w 1 w+2 w+2
+
+w2 1 w1+2 w1+2
+w2 1 w1+2 w1+2
+w2 w1+3 w1+2 w1+2
+w2 w1+3 w1+2 w1+2
+w2 w1+3 w1+2 w1+2
+w2 w1+18 w1+2 w1+2
+w2 0 w1+2 w1+2
+w2 1 w1+2 w1+2
+w2 1 0 w1+2
+w2 1 25 w1+2
+w2 1 25 w1+2
+w2 1 26 w1+2
+w2 1 26 26(w1+2)
+w2 1 0 26(w1+2)
+w2 1 w2 26(w1+2)
+w2 1 w2+16 26(w1+2)
+w2 1 w2+16 26(w1+2)
+w2 1 w2+16 (26w1 + w2 + 68)
+
+w3 1 w2+16 (26w1 + w2 + 68)
+w3 1 w2+16 (26w1 + w2 + 68)
+SKIP
+SKIP
+SKIP
+SKIP
+SKIP
+w3 1 w2+16 (26w1 + w2 + 68)
+SKIP
+SKIP
+SKIP
+w3 1 26 (26w1 + w2 + 68)
+w3 1 26 (676w1 + 26w2 + 1768)
+w3 1 0 (676w1 + 26w2 + 1768)
+w3 1 w3 (676w1 + 26w2 + 1768)
+w3 1 w3+9 (676w1 + 26w2 + 1768)
+w3 1 w3+9 (676w1 + 26w2 + 1768)
+w3 1 w3+9 (676w1 + 26w2 + w3 + 1777)
+
+w4 1 w3+9 (676w1 + 26w2 + w3 + 1777)
+SKIP
+SKIP
+SKIP
+SKIP
+SKIP
+SKIP
+w4 1 w3+9 (676w1 + 26w2 + w3 + 1777) [always the same]
+w4 1 0 (676w1 + 26w2 + w3 + 1777) 
+SKIP
+w4 1 26 (676w1 + 26w2 + w3 + 1777) 
+SKIP
+SKIP
+SKIP
+SKIP
+SKIP
+SKIP
+SKIP -- Z = (w1*26^3 + w2*26^2 + w3*26^1 + w4 + 46202)
+
+w5 _ _ Z
+w5 0 _ Z
+w5 Z _ Z
+w5 w4 _ Z
+w5 w4 _ (26^2 * w1 + 26 * w2 + w3 + 1777)
+w5 w4-8 _ (26^2 * w1 + 26 * w2 + w3 + 1777)
+w5 1/0 _ (26^2 * w1 + 26 * w2 + w3 + 1777)
+w5 1/0 _ (26^2 * w1 + 26 * w2 + w3 + 1777)
+w5 1/0 0 (26^2 * w1 + 26 * w2 + w3 + 1777)
+w5 1/0 25 (26^2 * w1 + 26 * w2 + w3 + 1777)
+w5 1/0 25/0 (26^2 * w1 + 26 * w2 + w3 + 1777)
+
+
+Add A
+Div B
+Add C
+
+In general:
+B = 1 or 26
+if B == 1
+    if (z mod 26 + A != w):
+        [x will be 1]
+        z = 26 * z + w + C
+
+if B == 26
+    if (z mod 26 + A != w):
+        [x will be 1]
+        z = z/26
+        z = 26 * z + w + C
+    else:
+        [x will be 0]
+        z = z / 26
+
+1. (Div 'z' (Value 1),Add 'x' (Value 10),Add 'y' (Value 2)
+2. (Div 'z' (Value 1),Add 'x' (Value 15),Add 'y' (Value 16)),
+3. (Div 'z' (Value 1),Add 'x' (Value 14),Add 'y' (Value 9)),
+4. (Div 'z' (Value 1),Add 'x' (Value 15),Add 'y' (Value 0)),
+5. (Div 'z' (Value 26),Add 'x' (Value (-8)),Add 'y' (Value 1)),
+6. (Div 'z' (Value 1),Add 'x' (Value 10),Add 'y' (Value 12)),
+7. (Div 'z' (Value 26),Add 'x' (Value (-16)),Add 'y' (Value 6)),
+8. (Div 'z' (Value 26),Add 'x' (Value (-4)),Add 'y' (Value 6)),
+9. (Div 'z' (Value 1),Add 'x' (Value 11),Add 'y' (Value 3)),
+10. (Div 'z' (Value 26),Add 'x' (Value (-3)),Add 'y' (Value 5)),
+11. (Div 'z' (Value 1),Add 'x' (Value 12),Add 'y' (Value 9)),
+12. (Div 'z' (Value 26),Add 'x' (Value (-7)),Add 'y' (Value 3)),
+13. (Div 'z' (Value 26),Add 'x' (Value (-15)),Add 'y' (Value 2)),
+14. (Div 'z' (Value 26),Add 'x' (Value (-7)),Add 'y' (Value 3))
+
+Pairs:
+1 -> 14 -- w1 + 2: w14 = w1 - 5
+2 -> 13 -- w2 + 16: w13 = (w1 + 1) 
+3 -> 8 -- w3 + 9: w8 = w3 + 5
+4 -> 5 -- w4 + 0: w5 = w4 -8
+6 -> 7 -- w6 + 12: w7 = w6 - 4
+9 -> 10 -- w9 + 3: w10 = w9
+11 -> 12 -- w11 + 9: w12 = w11 + 2
+
+Smallest:
+1. 6
+2. 1
+3. 1
+4. 1
+5. 9
+6. 5
+7. 1
+8. 6
+9. 1
+10. 1
+11. 1
+12. 3
+13. 2
+14. 1
+61119516111321
+
+Largest:
+1. 9
+2. 8
+3. 4
+4. 9
+5. 1
+6. 9
+7. 5
+8. 9
+9. 9
+10. 9
+11. 7
+12. 9
+13. 9
+14. 4
+98491959997994

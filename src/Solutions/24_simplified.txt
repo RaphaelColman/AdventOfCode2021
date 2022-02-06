@@ -1,41 +1,43 @@
-inp w
-mul x 0
-add x z
-mod x 26
-div z 1
+inp w -- 1
+mul x 0 --does nothing
+add x z --does nothing
+mod x 26 --does nothing
+div z 1 --does nothing
 add x 10
-eql x w
-eql x 0
-mul y 0
+eql x w --always false
+eql x 0 --always true
+mul y 0 --does nothing
 add y 25
-mul y x
+mul y x --does nothing: multiplying by 1
 add y 1
-mul z y
+mul z y --does nothing: z is 0
 mul y 0
 add y w
 add y 2
-mul y x
-add z y
-inp w
+mul y x --does nothing: x is 1
+add z y : should have w1 1 w1+2 w1+2
+
+inp w -- 2
 mul x 0
 add x z
-mod x 26
-div z 1
+mod x 26 --does nothing: should just = x
+div z 1 --does nothing
 add x 15
-eql x w
-eql x 0
+eql x w --always false
+eql x 0 --always true
 mul y 0
 add y 25
-mul y x
+mul y x --does nothing: multiplying by 1
 add y 1
 mul z y
 mul y 0
 add y w
 add y 16
-mul y x
-add z y
-inp w
-mul x 0
+mul y x --does nothing: x is 1
+add z y -- w2 1 w2+16 (26w1 + w2 + 68)
+
+inp w -- 3
+mul x 0 --does nothing
 add x z
 mod x 26
 div z 1
@@ -44,15 +46,16 @@ eql x w
 eql x 0
 mul y 0
 add y 25
-mul y x
+mul y x --does nothing: x is 1
 add y 1
 mul z y
 mul y 0
 add y w
 add y 9
-mul y x
-add z y
-inp w
+mul y x --does nothing
+add z y: w3 1 w3+9 (676w1 + 26w2 + w3 + 1777)
+
+inp w -- 4
 mul x 0
 add x z
 mod x 26
@@ -70,14 +73,15 @@ add y w
 add y 0
 mul y x
 add z y
-inp w
+
+inp w -- 5
 mul x 0
 add x z
-mod x 26
-div z 26
+mod x 26 -- w4 (4th input + 4th constant which is 0)
+div z 26 -- So fiddly! This means z is (26^2 * w1 + 26 * w2 + w3 + 1777)
 add x -8
-eql x w
-eql x 0
+eql x w (if w5 == 1 and w4 == 9 then now x == 1. Otherwise x == 0 because op82 will have made it 0 or negative)
+eql x 0 (if w5 == 1 and w4 == 9 then now x == 0. Otherwise x == 1)
 mul y 0
 add y 25
 mul y x
@@ -88,6 +92,7 @@ add y w
 add y 1
 mul y x
 add z y
+
 inp w
 mul x 0
 add x z
@@ -106,6 +111,7 @@ add y w
 add y 12
 mul y x
 add z y
+
 inp w
 mul x 0
 add x z
@@ -124,6 +130,7 @@ add y w
 add y 6
 mul y x
 add z y
+
 inp w
 mul x 0
 add x z
@@ -142,6 +149,7 @@ add y w
 add y 6
 mul y x
 add z y
+
 inp w
 mul x 0
 add x z
@@ -160,6 +168,7 @@ add y w
 add y 3
 mul y x
 add z y
+
 inp w
 mul x 0
 add x z
@@ -178,6 +187,7 @@ add y w
 add y 5
 mul y x
 add z y
+
 inp w
 mul x 0
 add x z
@@ -196,6 +206,7 @@ add y w
 add y 9
 mul y x
 add z y
+
 inp w
 mul x 0
 add x z
@@ -214,6 +225,7 @@ add y w
 add y 3
 mul y x
 add z y
+
 inp w
 mul x 0
 add x z
@@ -232,6 +244,7 @@ add y w
 add y 2
 mul y x
 add z y
+
 inp w
 mul x 0
 add x z
