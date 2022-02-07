@@ -52,10 +52,8 @@ parseInput = do
     compareX (V2 x1 _) (V2 x2 _) = compare x1 x2
     compareY (V2 _ y1) (V2 _ y2) = compare y1 y2
 
-part1 sb = done
-  where
-    stepped = iterate step sb !! 58
-    done = runSeabed sb
+part1 :: Seabed -> Int
+part1 = runSeabed
 
 runSeabed :: Seabed -> Int
 runSeabed = go 1
@@ -67,22 +65,7 @@ runSeabed = go 1
         stepped = step sb
 
 step :: Seabed -> Seabed
-step = stepSouth . stepEast
-
-stepEast :: Seabed -> Seabed
-stepEast (MkSeabed grid dimens@(V2 maxX maxY)) =
-  MkSeabed (M.union moved rest) dimens
-  where
-    (movable, rest) =
-      M.partitionWithKey
-        (\k v -> (v == East) && M.notMember (getNextEast k) grid)
-        grid
-    moved = M.mapKeys getNextEast movable
-    getNextEast (V2 x y) =
-      let next = x + 1
-       in if next > maxX
-            then V2 0 y
-            else V2 next y
+step = stepCucumber South . stepCucumber East
 
 stepCucumber :: SeaCucumber -> Seabed -> Seabed
 stepCucumber sc (MkSeabed grid dimens@(V2 maxX maxY)) =
@@ -90,25 +73,10 @@ stepCucumber sc (MkSeabed grid dimens@(V2 maxX maxY)) =
   where
     (movable, rest) =
       M.partitionWithKey
-        (\k v -> (v == South) && M.notMember (next k) grid)
+        (\k v -> (v == sc) && M.notMember (next k) grid)
         grid
     moved = M.mapKeys next movable
     next pt = getNext sc pt dimens
-
-stepSouth :: Seabed -> Seabed
-stepSouth (MkSeabed grid dimens@(V2 maxX maxY)) =
-  MkSeabed (M.union moved rest) dimens
-  where
-    (movable, rest) =
-      M.partitionWithKey
-        (\k v -> (v == South) && M.notMember (getNextSouth k) grid)
-        grid
-    moved = M.mapKeys getNextSouth movable
-    getNextSouth (V2 x y) =
-      let next = y + 1
-       in if next > maxY
-            then V2 x 0
-            else V2 x next
 
 getNext :: SeaCucumber -> Point -> Point -> Point
 getNext East (V2 x y) (V2 maxX maxY) =
