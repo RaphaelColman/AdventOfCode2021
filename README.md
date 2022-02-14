@@ -1307,3 +1307,59 @@ In my view, displaying the number system like this is a bit misleading. It looks
 
  
 ![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/day_18_writeup/res/graphs/both_sides.png)
+
+
+That means that modelling the way these pairs work is actually very simple. We can use an infinite data structure, which is something Haskeller's seem to _love_
+```haskell
+data Tree
+  = Pair Tree Tree
+  | Leaf Integer
+  deriving (Eq)
+```
+If you've done any Haskell tutorials, you will almost certainly have written a data type like this when learning about applicatives and functors, except that instead of insisting that the leaves of the trees are integers, you will have made it a higher-kinded data type. 
+
+Snailfish addition is pretty easy. You just create a new pair out of both elements. We can do that by literally calling the data constructor for `Pair`
+```haskell
+add :: Tree -> Tree -> Tree
+add = Pair
+```
+
+The thing that makes this puzzle tricky is the way snailfish numbers simplify, or 'reduce'. The rule is: "If any pair is nested inside four pairs, the leftmost such pair explodes." By 'explode' we mean that the left value is added to the first regular number to the left of the pair, and the right value is added to the first regular number to the right (If there is no number to add to, we just drop it entirely). So for example, 
+[[[[[9,8],1],2],3],4] -> [[[[0,9],2],3],4]
+The 9 has nowhere to go, so we drop it, and the 8 gets added to the 1 on the right of it. As a rose tree, it looks like this:
+
+![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/day_18_writeup/res/graphs/exploded_left.png)
+
+This kind of thing is surprisingly tricky! We can use plane old recursion to find pairs which are nested four levels deep, but once we've found that pair it's impossible to do anything sensible. Go ahead and try it if you don't believe me!
+```haskell
+explode' :: Tree -> Tree
+explode' = go 0
+  where
+    go depth tree
+      | depth == 4 =
+        case tree of
+          Leaf number        -> undefined -- What do I do with this number?
+          Pair left right -> undefined -- What do I do with these subtrees?
+      | otherwise = go (depth + 1) tree
+```
+By the time we've recursed to somewhere useful, we've lost sight of the rest of the tree, which is bad because we need access to the rest of it in order to figure out where to put our 'exploding' numbers. Fortunately, there's an fp concept which solves this exact problem: [zippers](https://en.wikipedia.org/wiki/Zipper_(data_structure))! 
+I learned about zippers (here)[http://learnyouahaskell.com/zippers].
+
+The idea behind a zipper is that it is a data type we can use to traverse infinite data structures, but while keeping of track of the rest of the structure as we traverse through it. What we do is leave a trail of 'breadcrumbs' which tell us a: what directions we took to get to where we are now (the focus) and b: what parts of the infinite structure we ignored on the way. It's easier if you see one, I promise!
+```haskell
+data Direction
+  = LEFT
+  | RIGHT
+  deriving (Eq, Show, Enum, Bounded)
+
+type Breadcrumbs = [Crumb]
+
+data Crumb =
+  Crumb
+    { _direction :: Direction
+    , _tree      :: Tree
+    }
+  deriving (Eq, Show)
+
+type Zipper = (Tree, Breadcrumbs)
+```

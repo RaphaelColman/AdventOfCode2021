@@ -8,6 +8,7 @@ import           Common.AoCSolutions            (AoCSolution (MkAoCSolution),
                                                  printTestSolutions)
 import           Common.EnumUtils               (enumNext)
 import           Control.Applicative            ((<|>))
+import           Control.Monad.Cont             (MonadTrans (lift), guard)
 import           Control.Monad.Loops            (iterateUntilM)
 import           Control.Monad.Trans.State.Lazy (State, StateT (StateT), get,
                                                  modify, put, runState)
@@ -18,7 +19,6 @@ import           Data.Maybe                     (fromJust, fromMaybe)
 import           Text.Trifecta                  (CharParsing (char), Parser,
                                                  brackets, integer, parens,
                                                  some, token)
-import Control.Monad.Cont (MonadTrans(lift), guard)
 
 aoc18 :: IO ()
 aoc18 = do
