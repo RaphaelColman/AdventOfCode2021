@@ -23,6 +23,7 @@
     - [Day 15](#day-15)
     - [Day 16](#day-16)
     - [Day 17](#day-17)
+    - [Day 18](#day-18)
 
 ### Overview
 This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
@@ -1141,7 +1142,7 @@ parseGroups = do
       (thisGroup ++) <$> parseGroups
     _ -> fail $ "Unexpected non-binary digit" ++ show first
 ```
-One of the things that is so nice about this model is the idea of the parser 'consuming' characters as it parses. Ironically, the code reads very imperatively, even though it's still pure and functional. We first parse a version, then a typeId. Then we use `guard` to check that the type id is 4 (if it's not that guard will invoke `fail` to cause the parser to fail). `ParseGroups` uses recursion to keep parsing groups of 4 digits until we get the signal to stop (the '1' indicating the last group).
+One of the things that is so nice about this model is the idea of the parser 'consuming' characters as it parses. Ironically, the code reads very imperatively, even though it's still pure and functional. We first parse a version, then a typeId. Then we use `guard` to check that the type id is 4 (if it's not that guard will invoke `fail` to cause the parser to fail). `ParseGroups` uses recursion to keep parsing groups of 4 digits until we get the signal to stop (the '0' indicating the last group).
 
 The operator parsing is a little more complicated. This concept of a `LengthTypeID` means we might be parsing a specific number of subpackets, or a specific number of characters. With Trifecta, I couldn't find a nice way of doing a specific number of characters except for creating a whole new parser and handling the `Result` of the inner parser explicitly. A specific number of packets is easy though, because we just use `count`.
 ```haskell
@@ -1282,3 +1283,27 @@ vectorRange ta@(V2 xmin ymin, V2 xmax ymax) = mapMaybe (`fireProbe` ta) vRange
     vRange = [V2 x y | x <- xRange, y <- yRange]
 ```
 Nice to have a break in the difficulty curve! I think this puzzle was easier than the other ones.
+
+### Day 18
+This one was definitely my favourite puzzle so far! The story of snailfish having a different arithmetic system reminded me a lot of [one of the puzzles last year](https://adventofcode.com/2020/day/18) where you have to help a kid with their maths homework.
+In this puzzle, snailfish numbers are always expressed as 'pairs', where each member of the pair can be a literal number, or another pair. here are some of the examples from the puzzle:
+```
+[[1,2],3]
+[[[[[9,8],1],2],3],4]
+[7,[6,[5,[4,[3,2]]]]]
+[[6,[5,[4,[3,2]]]],1]
+```
+
+In my view, displaying the number system like this is a bit misleading. It looks like a nested array, but actually, it's an infinite data structure called a [rose tree](https://en.wikipedia.org/wiki/Rose_tree). In fact, it's a simplified rose tree, because while rose trees can have any number of branches, this tree can only ever have two at each node. here is my preferred way of thinking about the numbers above:
+
+
+![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/day_18_writeup/res/graphs/simple.png)
+
+ 
+![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/day_18_writeup/res/graphs/left_tree.png)
+
+ 
+![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/day_18_writeup/res/graphs/right_tree.png)
+
+ 
+![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/day_18_writeup/res/graphs/both_sides.png)

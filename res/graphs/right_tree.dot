@@ -1,0 +1,13 @@
+digraph RightTree { 
+  label="[7,[6,[5,[4,[3,2]]]]]"
+  r7 -> {7 r6}
+  r6 -> {6 r5}
+  r5 -> {5 r4}
+  r4 -> {4 r3}
+  r3 -> {3 2}
+  r7 [shape=point]
+  r6 [shape=point]
+  r5 [shape=point]
+  r4 [shape=point]
+  r3 [shape=point]
+} 
