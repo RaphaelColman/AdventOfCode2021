@@ -1286,7 +1286,7 @@ Nice to have a break in the difficulty curve! I think this puzzle was easier tha
 
 ### Day 18
 This one was definitely my favourite puzzle so far! The story of snailfish having a different arithmetic system reminded me a lot of [one of the puzzles last year](https://adventofcode.com/2020/day/18) where you have to help a kid with their maths homework.
-In this puzzle, snailfish numbers are always expressed as 'pairs', where each member of the pair can be a literal number, or another pair. here are some of the examples from the puzzle:
+In this puzzle, snailfish numbers are always expressed as 'pairs', where each member of the pair can be a literal number, or another pair. Here are some of the examples from the puzzle:
 ```
 [[1,2],3]
 [[[[[9,8],1],2],3],4]
@@ -1309,7 +1309,7 @@ In my view, displaying the number system like this is a bit misleading. It looks
 ![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/day_18_writeup/res/graphs/both_sides.png)
 
 
-That means that modelling the way these pairs work is actually very simple. We can use an infinite data structure, which is something Haskeller's seem to _love_
+That means that modelling the way these pairs work is actually very simple. We can use an infinite data structure, which is something Haskeller's _love_
 ```haskell
 data Tree
   = Pair Tree Tree
@@ -1345,7 +1345,7 @@ explode' = go 0
 By the time we've recursed to somewhere useful, we've lost sight of the rest of the tree, which is bad because we need access to the rest of it in order to figure out where to put our 'exploding' numbers. Fortunately, there's an fp concept which solves this exact problem: [zippers](https://en.wikipedia.org/wiki/Zipper_(data_structure))! 
 I learned about zippers (here)[http://learnyouahaskell.com/zippers].
 
-The idea behind a zipper is that it is a data type we can use to traverse infinite data structures, but while keeping of track of the rest of the structure as we traverse through it. What we do is leave a trail of 'breadcrumbs' which tell us a: what directions we took to get to where we are now (the focus) and b: what parts of the infinite structure we ignored on the way. It's easier if you see one, I promise!
+The idea behind a zipper is that it is a data type we can use to traverse infinite data structures while keeping of track of the rest of the structure. What we do is leave a trail of 'breadcrumbs' which tell us A: what directions we took to get to where we are now (the focus) and B: what parts of the infinite structure we ignored on the way. It's easier if you see one, I promise!
 ```haskell
 data Direction
   = LEFT
@@ -1363,3 +1363,43 @@ data Crumb =
 
 type Zipper = (Tree, Breadcrumbs)
 ```
+So a zipper is just a tuple where the first value is the subtree or the 'focus', and the second value is a list of breadcrumbs for how we got to that focus. So now we can start writing functions for travelling through our tree. For example:
+```haskell
+zipDown :: Direction -> Zipper -> Maybe Zipper
+zipDown direction (Pair l r, bs) =
+  case direction of
+    LEFT  -> Just (l, Crumb LEFT r : bs)
+    RIGHT -> Just (r, Crumb RIGHT l : bs)
+zipDown _ (Leaf _, _) = Nothing
+```
+Given a direction and a zipper, we return a new zipper where we have gone one step in that direction. Notice how if we go LEFT then we take the subtree we ignored and put in in the new breadcrumb we are adding to the list. The thing that makes this so powerful is that we can use a zipper to retrace our steps. So we can zip back up to where we were in the tree:
+```haskell
+zipUp :: Zipper -> Maybe Zipper
+zipUp (tree, bc:rest) =
+  case bc of
+    Crumb LEFT subTree  -> Just (Pair tree subTree, rest)
+    Crumb RIGHT subTree -> Just (Pair subTree tree, rest)
+zipUp (_, []) = Nothing
+```
+Here we use a case statement for the first breadcrumb in the list, and simply return create a new zipper using the focus we just came from and the subtree from the breadcrumb. We can zip all the way to the top of a tree like this:
+```haskell
+zipToTop :: Zipper -> Tree
+zipToTop zipper@(tree, [])      = tree
+zipToTop zipper@(tree, bc:rest) = fromJust $ zipToTop <$> zipUp zipper
+```
+This one doesn't need to return a zipper - the breadcrumb list would always be empty if it did.
+So let's go over what we actually need to do in order to 'explode' a pair. This might be easier if you follow along the diagram for `[[6,[5,[4,[3,2]]]],1]`. Imagine what we have to do to the number '2' in the nested pair. We know, intuitively, that it has to be added to the '1' at the end. but how would you encode that in an algorithm? The way to think about it is that we need to the next 'right-facing' branch along from ours, and then find the leftmost left on that branch. So we travel up the tree until the first breadcrumb where we went left. That one is important, because it means there was a right-branch to travel down which we didn't take. Then we travel down that one and just carry on going left until we hit a leaf. Here's the code I wrote:
+```haskell
+neighbour :: Direction -> Zipper -> Maybe Zipper
+neighbour direction zipper@(tree, bc) =
+  iterateUntilM
+    (\z -> previousDirection z == Just oppositeDirection)
+    zipUp
+    zipper >>=
+  zipUp >>=
+  zipDown direction >>=
+  iterateUntilM isLeaf (zipDown oppositeDirection)
+  where
+    oppositeDirection = enumNext direction
+```
+This one is generic for both directions. You travel up until you find a branch which is opposite to the direction you wish to go. Then you travel down that new branch. The `>>=` symbol is for monads. It's the same as 'flatmap' in most languages 
