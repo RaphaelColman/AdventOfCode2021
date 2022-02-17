@@ -1,0 +1,11 @@
+digraph LeftTree { 
+  label="[[[[[9,8],1],2],3],4]"
+  r4 [shape=point]
+  r3 [shape=point]
+  r2 [shape=point]
+  r1 [shape=point]
+  r4 -> {4 r3}
+  r3 -> {3 r2}
+  r2 -> {2 r1}
+  r1 -> {9 8}
+} 

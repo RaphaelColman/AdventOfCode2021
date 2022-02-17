@@ -8,9 +8,11 @@ import           Common.AoCSolutions            (AoCSolution (MkAoCSolution),
                                                  printTestSolutions)
 import           Common.EnumUtils               (enumNext)
 import           Control.Applicative            ((<|>))
+import           Control.Monad.Cont             (MonadTrans (lift), guard)
 import           Control.Monad.Loops            (iterateUntilM)
-import           Control.Monad.Trans.State.Lazy (State, StateT (StateT), get,
-                                                 modify, put, runState)
+import           Control.Monad.Trans.State.Lazy (State, StateT (StateT),
+                                                 execState, get, modify, put,
+                                                 runState)
 import           Data.Foldable                  (foldlM)
 import           Data.Function                  ((&))
 import           Data.List                      (findIndex, foldl1', unfoldr)
@@ -18,7 +20,6 @@ import           Data.Maybe                     (fromJust, fromMaybe)
 import           Text.Trifecta                  (CharParsing (char), Parser,
                                                  brackets, integer, parens,
                                                  some, token)
-import Control.Monad.Cont (MonadTrans(lift), guard)
 
 aoc18 :: IO ()
 aoc18 = do
@@ -146,17 +147,16 @@ toFirstExplodable tree = go 0 (tree, [])
 explode :: Tree -> Maybe Tree
 explode tree = do
   zipper@(Pair (Leaf l) (Leaf r), bs) <- toFirstExplodable tree
-  let with0 = zipper & modifyZipper (Leaf 0) & zipToTop
-  let leftCarry =
-        fromMaybe with0 $
-        neighbour LEFT zipper >>= carry LEFT l with0 . extractDirections
-  let rightCarry =
-        fromMaybe leftCarry $
-        neighbour RIGHT zipper >>= carry LEFT r leftCarry . extractDirections
-  pure rightCarry
+  pure $ execState (go zipper l r) tree
   where
-    carry :: Direction -> Integer -> Tree -> [Direction] -> Maybe Tree
-    carry direction value tree' directions = addAtLeaf value directions tree'
+    go zipper leftValue rightValue = do
+      put $ modifyZipper (Leaf 0) zipper & zipToTop
+      modify $ carry leftValue zipper LEFT
+      modify $ carry rightValue zipper RIGHT
+    carry value zipper direction tree =
+      fromMaybe tree $ do
+        neighbourZipper <- neighbour direction zipper
+        addAtLeaf value (extractDirections neighbourZipper) tree
 
 extractDirections :: Zipper -> [Direction]
 extractDirections (_, bs) = reverse $ map _direction bs
