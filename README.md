@@ -1372,7 +1372,7 @@ zipDown direction (Pair l r, bs) =
     RIGHT -> Just (r, Crumb RIGHT l : bs)
 zipDown _ (Leaf _, _) = Nothing
 ```
-Given a direction and a zipper, we return a new zipper where we have gone one step in that direction. Notice how if we go LEFT then we take the subtree we ignored and put in in the new breadcrumb we are adding to the list. The thing that makes this so powerful is that we can use a zipper to retrace our steps. So we can zip back up to where we were in the tree:
+Given a direction and a zipper, we return a new zipper where we have gone one step in that direction. Notice how if we go LEFT then we take the subtree we ignored and put in in the new breadcrumb (the one we are adding to the list). The thing that makes this so powerful is that we can use a zipper to retrace our steps. So we can zip back up to where we previously were in the tree:
 ```haskell
 zipUp :: Zipper -> Maybe Zipper
 zipUp (tree, bc:rest) =
@@ -1388,7 +1388,7 @@ zipToTop zipper@(tree, [])      = tree
 zipToTop zipper@(tree, bc:rest) = fromJust $ zipToTop <$> zipUp zipper
 ```
 This one doesn't need to return a zipper - the breadcrumb list would always be empty if it did.
-So let's go over what we actually need to do in order to 'explode' a pair. This might be easier if you follow along the diagram for `[[6,[5,[4,[3,2]]]],1]`. Imagine what we have to do to the number '2' in the nested pair. We know, intuitively, that it has to be added to the '1' at the end. but how would you encode that in an algorithm? The way to think about it is that we need to the next 'right-facing' branch along from ours, and then find the leftmost left on that branch. So we travel up the tree until the first breadcrumb where we went left. That one is important, because it means there was a right-branch to travel down which we didn't take. Then we travel down that one and just carry on going left until we hit a leaf. Here's the code I wrote:
+So let's go over what we actually need to do in order to 'explode' a pair. This might be easier if you follow along the diagram for `[[6,[5,[4,[3,2]]]],1]`. Imagine what we have to deal with the number '2' in the nested pair. We know, intuitively, that it has to be added to the '1' at the end. but how would you encode that in an algorithm? The way to think about it is that we need to the next 'right-facing' branch along from ours, and then find the leftmost leaf on that branch. So we travel up the tree until the first breadcrumb where we went left. That one is important, because it means there was a right-branch to travel down which we didn't take. Then we travel down that one and just carry on going left until we hit a leaf. Here's the code I wrote:
 ```haskell
 neighbour :: Direction -> Zipper -> Maybe Zipper
 neighbour direction zipper@(tree, bc) =
@@ -1401,5 +1401,129 @@ neighbour direction zipper@(tree, bc) =
   iterateUntilM isLeaf (zipDown oppositeDirection)
   where
     oppositeDirection = enumNext direction
+
+isLeaf :: Zipper -> Bool
+isLeaf (Leaf i, _) = True
+isLeaf _           = False
+
+previousDirection :: Zipper -> Maybe Direction
+previousDirection (_, (Crumb direction _):_) = Just direction
+previousDirection _                          = Nothing
 ```
-This one is generic for both directions. You travel up until you find a branch which is opposite to the direction you wish to go. Then you travel down that new branch. The `>>=` symbol is for monads. It's the same as 'flatmap' in most languages 
+This one is generic for both directions. You travel up until you find a branch which is opposite to the direction you wish to go. Then you travel down that new branch. The `>>=` symbol is for monads. It's the same as 'flatmap' in most languages except it's an infix operator. So it will flatmap whatever is on the left with the function on the right. You can use them to chain multiple monadic functions together - just like `Do` notation. Here it's preferable to `Do` because it means I don't need to come up with a name to bind each intermediate step to.
+
+`iterateUntilM` is the monad version of `iterateUntil`. You give it a predicate, a function and a starting value, and it will perform the function on the starting value until the predicate is true. Of course, in thise case, the function is something which returns a monad (in our case, a `Maybe`). So here, we `zipUp` until the 'previous direction' (the one we fished out of the last breadcrumb) is opposie to the direction we are trying to go in. Then we zipUp one more time, and zipDown in that direction. And voila! We'll hit the nearest neighbour for that direction. If there isn't one, then we'll get a `Nothing`
+
+So now we have the logic for finding our nearest neighbour for any given direction, the rest is actually quite straightforward - provided we use our zippers. We need that recursive logic to find pairs which are nested four levels deep in the tree:
+```haskell
+toFirstExplodable :: Tree -> Maybe Zipper
+toFirstExplodable tree = go 0 (tree, [])
+  where
+    go :: Integer -> Zipper -> Maybe Zipper
+    go depth zipper@(tree, bs)
+      | depth == 4 =
+        case tree of
+          Leaf _   -> Nothing
+          Pair l r -> Just zipper
+      | otherwise = do
+        let leftBranch = zipDown LEFT zipper >>= go (depth + 1)
+        let rightBranch = zipDown RIGHT zipper >>= go (depth + 1)
+        leftBranch <|> rightBranch
+
+```
+and then, finally the function we can call to 'explode' a snailfish number. Here is my (quite messy) first attempt.
+```haskell
+explode :: Tree -> Maybe Tree
+explode tree = do
+  zipper@(Pair (Leaf l) (Leaf r), bs) <- toFirstExplodable tree
+  let with0 = zipper & modifyZipper (Leaf 0) & zipToTop
+  let leftCarry =
+        fromMaybe with0 $
+        neighbour LEFT zipper >>= carry l with0 . extractDirections
+  let rightCarry =
+        fromMaybe leftCarry $
+        neighbour RIGHT zipper >>= carry r leftCarry . extractDirections
+  pure rightCarry
+  where
+    carry :: Integer -> Tree -> [Direction] -> Maybe Tree
+    carry value tree' directions = addAtLeaf value directions tree'
+extractDirections :: Zipper -> [Direction]
+extractDirections (_, bs) = reverse $ map _direction bs
+
+addAtLeaf :: Integer -> [Direction] -> Tree -> Maybe Tree
+addAtLeaf toAdd directions tree = do
+  zipper@(atSubTree, bs) <- foldlM (flip zipDown) asZipper directions
+  case atSubTree of
+    Leaf i   -> pure $ modifyZipper (Leaf (i + toAdd)) zipper & zipToTop
+    Pair _ _ -> Nothing
+  where
+    asZipper = (tree, [])
+
+modifyZipper :: Tree -> Zipper -> Zipper
+modifyZipper newValue (tree, bs) = (newValue, bs)
+```
+The thing that makes this hard to write neatly is that if we modify the contents of one zipper, we can't then use another zipper do perform another modification - we have to use the zipper we just modified. So the only way I could think to put this together was to keep converting the zippers back into plain on trees by zipping to the top at the end of each operation. Also, we can't take advantage of `do` notation here to handle the case where 'carrying' a number right or left returns a `Nothing`, because that would make the whole function return a `Nothing`. In actualy fact, if carrying returns `Nothing` then we want to just use the unmodified tree (remember how exploding numbers with no neighbour to add to just get ignored).
+
+The other issue is that we're really dealing with state here. We're modifying a tree, then modifying it again etc. That's why we have those awkward variable names (`leftCarry` and `rightCarry` etc). I ended up rewriting this to use the state monad:
+```haskell
+explode :: Tree -> Maybe Tree
+explode tree = do
+  zipper@(Pair (Leaf l) (Leaf r), bs) <- toFirstExplodable tree
+  pure $ execState (go zipper l r) tree
+  where
+    go zipper leftValue rightValue = do
+      put $ modifyZipper (Leaf 0) zipper & zipToTop
+      modify $ carry leftValue zipper LEFT
+      modify $ carry rightValue zipper RIGHT
+    carry value zipper direction tree =
+      fromMaybe tree $ do
+        neighbourZipper <- neighbour direction zipper
+        addAtLeaf value (extractDirections neighbourZipper) tree
+```
+In this, simplified verison, we use `execState` to run a state monad function. That gives us access to state functions like `put` and `modify`. Much simplier! We simply `put` the state where we convert the nested pair to be a leaf of 0, then we `modify` the resulting tree to carry the left value to the left, and then modify again to carry the right value to the right.
+
+Believe or not, the hard part is over. The other operation we have to perform is a 'split'. The rule is: "If any regular number is 10 or greater, the leftmost such regular number splits". To split a regular number, replace it with a pair; the left element of the pair should be the regular number divided by two and rounded down, while the right element of the pair should be the regular number divided by two and rounded up. For example, 10 becomes [5,5], 11 becomes [5,6], 12 becomes [6,6], and so on.
+
+This is much easier to achieve. There's no tricky logic required to figure out what it means to find the nearest neighbour to a number. We just need a function to find the first splittable number, then another one to replace that leaf with a pair. I decied to make the first function return a zipper to be consistent with the approach we took to exploding.
+
+```haskell
+toFirstSplittable :: Tree -> Maybe Zipper
+toFirstSplittable tree = go (tree, [])
+  where
+    go :: Zipper -> Maybe Zipper
+    go zipper@(Leaf i, bs)
+      | i >= 10 = Just zipper
+      | otherwise = Nothing
+    go zipper@(tree, bs) = do
+      let leftBranch = zipDown LEFT zipper >>= go
+      let rightBranch = zipDown RIGHT zipper >>= go
+      leftBranch <|> rightBranch
+
+split :: Tree -> Maybe Tree
+split tree = do
+  zipper@(Leaf l, bs) <- toFirstSplittable tree
+  let (lft, rt) = splitInteger l
+  pure $ modifyZipper (Pair (Leaf lft) (Leaf rt)) zipper & zipToTop
+
+splitInteger :: Integer -> (Integer, Integer)
+splitInteger i =
+  let divided = i `div` 2
+   in (divided, i - divided)
+```
+
+Finally, the puzzle introduces the idea of a 'magnitude'. The magnitude of a pair is just 3 * left + 2 * right. This is pretty simple:
+```haskell
+magnitude :: Tree -> Integer
+magnitude = go
+  where
+    go (Leaf i)     = i
+    go (Pair p1 p2) = (3 * go p1) + (2 * go p2)
+
+part1 :: [Tree] -> Integer
+part1 = magnitude . sumTrees
+
+part2 :: [Tree] -> Integer
+part2 = maximum . map (magnitude . sumTrees) . variate 2
+```
+The `variate` funtion is from the excellent `combinatorial` library. In this case, it will get every possible pair of elements from a list.
+I think this puzzle lent itself to haskell quite well. Infinite data structures are easy to do, and I think immutability forces you to break each operation into simple chunks which are easier to understand.
