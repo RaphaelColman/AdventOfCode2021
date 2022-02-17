@@ -1294,19 +1294,19 @@ In this puzzle, snailfish numbers are always expressed as 'pairs', where each me
 [[6,[5,[4,[3,2]]]],1]
 ```
 
-In my view, displaying the number system like this is a bit misleading. It looks like a nested array, but actually, it's an infinite data structure called a [rose tree](https://en.wikipedia.org/wiki/Rose_tree). In fact, it's a simplified rose tree, because while rose trees can have any number of branches, this tree can only ever have two at each node. here is my preferred way of thinking about the numbers above:
+In my view, displaying the number system like this is a bit misleading. It looks like a nested array, but actually, it's an infinite data structure called a [rose tree](https://en.wikipedia.org/wiki/Rose_tree). In fact, it's a simplified rose tree, because while rose trees can have any number of branches, this tree can only ever have two at each node. Here is my preferred way of thinking about the numbers above:
 
 
-![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/day_18_writeup/res/graphs/simple.png)
-
- 
-![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/day_18_writeup/res/graphs/left_tree.png)
+![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/main/res/graphs/simple.png)
 
  
-![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/day_18_writeup/res/graphs/right_tree.png)
+![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/main/res/graphs/left_tree.png)
 
  
-![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/day_18_writeup/res/graphs/both_sides.png)
+![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/main/res/graphs/right_tree.png)
+
+ 
+![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/main/res/graphs/both_sides.png)
 
 
 That means that modelling the way these pairs work is actually very simple. We can use an infinite data structure, which is something Haskeller's _love_
@@ -1328,7 +1328,7 @@ The thing that makes this puzzle tricky is the way snailfish numbers simplify, o
 [[[[[9,8],1],2],3],4] -> [[[[0,9],2],3],4]
 The 9 has nowhere to go, so we drop it, and the 8 gets added to the 1 on the right of it. As a rose tree, it looks like this:
 
-![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/day_18_writeup/res/graphs/exploded_left.png)
+![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/main/res/graphs/exploded_left.png)
 
 This kind of thing is surprisingly tricky! We can use plane old recursion to find pairs which are nested four levels deep, but once we've found that pair it's impossible to do anything sensible. Go ahead and try it if you don't believe me!
 ```haskell
@@ -1343,7 +1343,7 @@ explode' = go 0
       | otherwise = go (depth + 1) tree
 ```
 By the time we've recursed to somewhere useful, we've lost sight of the rest of the tree, which is bad because we need access to the rest of it in order to figure out where to put our 'exploding' numbers. Fortunately, there's an fp concept which solves this exact problem: [zippers](https://en.wikipedia.org/wiki/Zipper_(data_structure))! 
-I learned about zippers (here)[http://learnyouahaskell.com/zippers].
+I learned about zippers [here](http://learnyouahaskell.com/zippers).
 
 The idea behind a zipper is that it is a data type we can use to traverse infinite data structures while keeping of track of the rest of the structure. What we do is leave a trail of 'breadcrumbs' which tell us A: what directions we took to get to where we are now (the focus) and B: what parts of the infinite structure we ignored on the way. It's easier if you see one, I promise!
 ```haskell
