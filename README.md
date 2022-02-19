@@ -24,6 +24,7 @@
     - [Day 16](#day-16)
     - [Day 17](#day-17)
     - [Day 18](#day-18)
+    - [Day 19](#day-19)
 
 ### Overview
 This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
@@ -1516,3 +1517,111 @@ part2 = maximum . map (magnitude . sumTrees) . variate 2
 ```
 The `variate` funtion is from the excellent `combinatorial` library. In this case, it will get every possible pair of elements from a list.
 I think this puzzle lent itself to haskell quite well. Infinite data structures are easy to do, and I think immutability forces you to break each operation into simple chunks which are easier to understand.
+
+### Day 19
+Phew! This is the puzzle where I fell of the wagon of doing them every day. It's amazing how your motivation drops after that. If memory serves, it took me until just before Christmas to get around to solving this one. Ah well! Before I go on: I confess I referred to the excellent solutions in Dart in [this repo](https://github.com/alexburlton/advent-of-code-beleaguered-badger) written by a friend of mine for inspiration for some of the puzzles from here onwards. This is one of those puzzles.
+The idea here is that we have a list of 'scanners' in 3d space, all of which can see a set of 'beacons'. The 'catches' are:
+1. You don't know where the scanners are relative to each other
+2. There are some beacons which can be seen by multiple different scanners (so their sets intersect)
+3. The beacons are not all facing the same direction. They can be rotated in any of the [24 orientations you can rotate a cube in](https://garsia.math.yorku.ca/~zabrocki/math4160w03/cubesyms/).
+
+The rule set out by the puzzle is that if you take two scanners and, after rotating both of them in all permutations, you find that they describe _at least 12_ common beacons, you can safely identify that as an overlapping area. Put another way, if at least 12 beacons are the same vector from each other according to both scanners, they must be the same beacons. Our task is to figure out how many beacons there are in total
+
+The way I eventually went about this was:
+1. Tkae one scanner and use it as the 'origin' (so its location is 0,0,0).
+2. Put all the other scanners in in a queue.
+3. Pick a scanner out of the queue. See if you can identify 12 overlapping beacons (they will all be the same distance from each other). If you can't, rotate the scanner one of the 23 remaining orientations.
+4. If you still can't find 12 overlapping beacons, put this scanner in the back of the queue and try the next one.
+5. If you could find 12 overlapping beacons, use this orientation to plot the new scanner relative to the origin. It's distance to the origin will be the same as the distance of any of the overlapping beacons to their counterpart in the first scanner's set.
+
+Ok, still quite tricky to be honest, but it's a start.
+The first quite useful function to define is the orientations of a cube:
+```haskell
+--x = forward/backwards
+--y = up/down
+--z = left/right
+allOrientations :: Num a => V3 a -> [V3 a]
+allOrientations v = concatMap allRotations allFacings
+  where
+    backwards (V3 x y z) = V3 (-x) y (-z)
+    up (V3 x y z) = V3 y (-x) z
+    down (V3 x y z) = V3 (-y) x z
+    left (V3 x y z) = V3 (-z) y x
+    right (V3 x y z) = V3 z y (-x)
+    clockwise90 (V3 x y z) = V3 x z (-y)
+    clockwise180 (V3 x y z) = V3 x (-y) (-z)
+    clockwise270 (V3 x y z) = V3 x (-z) y
+    allFacings = map (\f -> f v) [id, backwards, up, down, left, right]
+    allRotations v' =
+      map (\f -> f v') [id, clockwise90, clockwise180, clockwise270]
+```
+This mouthful of a function will take any point in space and convert it to a list of equivalent points if you, (the origin) were to rotate in any of the 24 orientations of a cube. So for example, the point (1,2,3) would become (3, 2, -1) if you were to rotate yourself to the right by 90 degrees (using x as forward/backwards, y as up/down and z as left/right). We get all 24 by combining all the 6 directions you can face with all 4 rotations.
+
+As usual, it makes sense to create some models:
+```haskell
+type Point = V3 Integer
+
+data Scanner =
+  MkScanner
+    { _beacons  :: S.Set Point
+    , _location :: Point
+    }
+  deriving (Eq, Show, Ord)
+
+data ScannerQueue =
+  MkSQ
+    { _found     :: [Scanner]
+    , _remaining :: Seq.Seq Scanner
+    }
+  deriving (Eq, Show)
+```
+
+Before considering the solution it code, it helps to visualise how we might compare to scanners. See we are comparing an origin scanner (which is never going to be moved or rotated) and a 'new' scanner. First, we create all the 24 orientations of that new scanner (so we get 24 sets of beacons). But it's still not enough to just look for overlapping coordinates, because the beacons themselves might be different distances from their respective scanner. We need to normalise those distances, so for each rotated scanner we need to consider every possible 'transposition' of that scanner - ie that scanner moved so at at least one of its points is the same coordinate as one of the points on the origin scanner. Only then can we be sure we will spot the 12 overlapping beacons if they exist. After rotating and transposing for each orientation, we can now say the beacons are overlapping if they have the same coordinates.
+
+```haskell
+relativeNeighbour :: Scanner -> Scanner -> Maybe Scanner
+relativeNeighbour base scanner = do
+  let allRotations = rotateScanner scanner
+  headMay $ mapMaybe (compare' base) allRotations
+  where
+    compare' base'@(MkScanner basePoints baseLoc) scanner'@(MkScanner points loc) =
+      let allTranspositions =
+            S.map (uncurry (-)) $ S.cartesianProduct basePoints points
+          allTransposedScanners =
+            S.map (transposeScanner scanner') allTranspositions
+       in find
+            (\(MkScanner points loc) ->
+               length (S.intersection points basePoints) >= 12)
+            allTransposedScanners
+
+transposeScanner :: Scanner -> V3 Integer -> Scanner
+transposeScanner (MkScanner points location) transposition =
+  MkScanner (S.map (+ transposition) points) (location + transposition)
+
+rotateScanner :: Scanner -> [Scanner]
+rotateScanner (MkScanner points location) =
+  map (flip MkScanner (V3 0 0 0) . S.fromList) $
+  transpose $ map allOrientations $ S.toList points
+```
+The stage we're at in AoC now is suitably advanced that the challenge is not in writing Haskell, but just solving the puzzle at all. The only things of note here:
+* `headMay` is a safe version of `head`. It will attempt to get the first item from a list, but return a `Nothing` if the list is empty.
+* The contract of ths function is to return a `Just Scanner` if it found enoug overlapping beacons. The scanner it returns will be rotated and transposed to the orientation where the beacons overlapped (so it will already be 'plotted' relative to the origin)
+
+So now we just have to write the queue:
+```haskell
+runQueue :: ScannerQueue -> Maybe [Scanner]
+runQueue sq@(MkSQ found remaining)
+  | null remaining = pure found
+  | otherwise = stepQueue sq >>= runQueue
+
+stepQueue :: ScannerQueue -> Maybe ScannerQueue
+stepQueue (MkSQ found remaining) = do
+  tryScanner <- remaining Seq.!? 0
+  let restOfList = Seq.drop 1 remaining
+  let orientated = headMay $ mapMaybe (`relativeNeighbour` tryScanner) found
+  case orientated of
+    Just o  -> pure $ MkSQ (o : found) restOfList
+    Nothing -> pure $ MkSQ found (restOfList Seq.|> tryScanner)
+```
+In case you haven't seen it before: The `|>` operator is for `Sequences`, and will append items to the end of a sequence (so in this case it will send a scanner to the back fo the queue).
+This puzzle involved much more thinking that coding. I'm glad I got all the orientations right - it would have been really hard to debug if not.

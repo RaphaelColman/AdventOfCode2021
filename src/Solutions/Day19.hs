@@ -1,4 +1,6 @@
-module Solutions.Day19 where
+module Solutions.Day19
+  ( aoc19
+  ) where
 
 import           Combinatorics       (tuples)
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
@@ -106,8 +108,8 @@ rotateScanner (MkScanner points location) =
 
 data ScannerQueue =
   MkSQ
-    { found     :: [Scanner]
-    , remaining :: Seq.Seq Scanner
+    { _found     :: [Scanner]
+    , _remaining :: Seq.Seq Scanner
     }
   deriving (Eq, Show)
 
