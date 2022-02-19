@@ -147,12 +147,10 @@ toFirstExplodable tree = go 0 (tree, [])
 explode :: Tree -> Maybe Tree
 explode tree = do
   zipper@(Pair (Leaf l) (Leaf r), bs) <- toFirstExplodable tree
-  pure $ execState (go zipper l r) tree
+  pure $
+    modifyZipper (Leaf 0) zipper & zipToTop & carry l zipper LEFT &
+    carry r zipper RIGHT
   where
-    go zipper leftValue rightValue = do
-      put $ modifyZipper (Leaf 0) zipper & zipToTop
-      modify $ carry leftValue zipper LEFT
-      modify $ carry rightValue zipper RIGHT
     carry value zipper direction tree =
       fromMaybe tree $ do
         neighbourZipper <- neighbour direction zipper
