@@ -25,6 +25,7 @@
     - [Day 17](#day-17)
     - [Day 18](#day-18)
     - [Day 19](#day-19)
+    - [Day 20](#day-20)
 
 ### Overview
 This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
@@ -1528,7 +1529,7 @@ The idea here is that we have a list of 'scanners' in 3d space, all of which can
 The rule set out by the puzzle is that if you take two scanners and, after rotating both of them in all permutations, you find that they describe _at least 12_ common beacons, you can safely identify that as an overlapping area. Put another way, if at least 12 beacons are the same vector from each other according to both scanners, they must be the same beacons. Our task is to figure out how many beacons there are in total
 
 The way I eventually went about this was:
-1. Tkae one scanner and use it as the 'origin' (so its location is 0,0,0).
+1. Take one scanner and use it as the 'origin' (so its location is 0,0,0).
 2. Put all the other scanners in in a queue.
 3. Pick a scanner out of the queue. See if you can identify 12 overlapping beacons (they will all be the same distance from each other). If you can't, rotate the scanner one of the 23 remaining orientations.
 4. If you still can't find 12 overlapping beacons, put this scanner in the back of the queue and try the next one.
@@ -1625,3 +1626,42 @@ stepQueue (MkSQ found remaining) = do
 ```
 In case you haven't seen it before: The `|>` operator is for `Sequences`, and will append items to the end of a sequence (so in this case it will send a scanner to the back fo the queue).
 This puzzle involved much more thinking that coding. I'm glad I got all the orientations right - it would have been really hard to debug if not.
+
+### Day 20
+To be honest, I wasn't so keen on this puzzle. The 'puzzle-bit' felt more like a sneaky trap than a satisfying puzzle. You'll see what I mean when we get to the end. The puzzle asks us to implement an an algorithm. You're given a starting image (made of, as per usual '.' to represent dark pixels and '#' characters to represent light pixels) and something called an 'image enhancement algorithm', which is just a 512-length list of '.' and '#' characters. For each pixel in the starting image, you have to create a binary number out of it and its neighbours (starting top-left, finishing top-right) where dark pixels are 0 and light pixesl are 1. You then look up the corresopnding character in the image enhancement algorithm and that will be the value for the pixel in the output image. You can iterate this process as many times as you like, bearing in mind the starting image is actually infinitely big, where all unknow points are dark pixels.
+
+Implementing this is fairly straightforward. We can make the IEA a set of points (just the light pixels). We could probably have done the same thing for the image itself, but I didn't bother, I just made it a map of coordinate -> pixel value
+```haskell
+type IEA = S.Set Integer
+
+initIEA :: [Pixel] -> IEA
+initIEA pixels =
+  S.fromList $ map snd . filter ((== LIGHT) . fst) $ zip pixels [0 ..]
+
+data Pixel
+  = DARK
+  | LIGHT
+  deriving (Enum, Ord, Show, Eq)
+
+type LightPixels = S.Set (V2 Int)
+
+type Input = (Grid Pixel, IEA)
+
+data ImageState =
+  MkState
+    { _grid      :: Grid Pixel
+    , _iea       :: IEA
+    , _iteration :: Integer
+    }
+  deriving (Eq, Show)
+```
+The reason I'm keeping track of 'iteration' will become clear soon.
+The only difficulty in implementing this is working out what to do with pixels on the edge of our known region. The IEA in the test input starts off like this:
+```
+..#.#..#####
+```
+The first character is a light pixel. That means we can assume that any light pixel entirely surrounded by light pixels will remain light after being enhanced. That's because they'll form the number 0, which is also a light pixel. You can see this in the examples - all the surrounding pixels which are light just stay light. _However_, if you look at the actual test input, it starts off like this:
+```
+###.#####.
+```
+Sneaky! That means any light pixel surrounded by light pixels will flip to being dark.
