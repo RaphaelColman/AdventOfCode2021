@@ -1664,4 +1664,63 @@ The first character is a light pixel. That means we can assume that any light pi
 ```
 ###.#####.
 ```
-Sneaky! That means any light pixel surrounded by light pixels will flip to being dark.
+Sneaky! That means any light pixel surrounded by light pixels will flip to being dark. That's why I've included `_iteration` as one of the fields. For unknown pixels, we can reason that they will be light on even-numbered iterations and dark on odd-numbered ones.
+
+Our `enhance` function will look something like this:
+```haskell
+enhance :: Pixel -> Grid Pixel -> IEA -> V2 Int -> Pixel
+enhance default' grid iea point =
+  if decimal `S.member` iea
+    then LIGHT
+    else DARK
+  where
+    pts = sortBy orderPoints $ S.toList $ S.insert point (neighbours point)
+    decimal = toDecimal $ map (flip (M.findWithDefault default') grid) pts
+
+orderPoints :: Point -> Point -> Ordering
+orderPoints (V2 x1 y1) (V2 x2 y2) =
+  case compare y1 y2 of
+    EQ -> compare x1 x2
+    o  -> o
+
+toDecimal :: (Enum e) => [e] -> Integer
+toDecimal = sum . (zipWith (*) [2 ^ n | n <- [0,1 ..]]) . reverse . asIntList
+  where
+    asIntList :: (Enum e) => [e] -> [Integer]
+    asIntList = map (toInteger . fromEnum)
+```
+We have a custom `Ordering` function so that when we get all the neighbours of a point, they are ordered from top-left to bottom-right. We then convert that set of neighbouring points to a number by using the enum value of the pixel (Dark is 0 because it is the first enum). The `enhance` function takes a 'default' as a parameter, so we can control whether unknow pixels are light or dark.
+
+As usual, we can create a loop like this by simply defining how we step from one `ImageState` to the next one:
+```haskell
+stepImageState :: ImageState -> ImageState
+stepImageState (MkState grid iea iteration) =
+  ($!) MkState enhanced iea (iteration + 1)
+  where
+    enhanced = M.mapWithKey enhance' $ expand default' grid
+    enhance' point _ = enhance default' grid iea point
+    default' =
+      if even iteration
+        then DARK
+        else LIGHT
+
+expand :: Pixel -> Grid Pixel -> Grid Pixel
+expand default' grid =
+  M.fromList $ map (\p -> (p, M.findWithDefault default' p grid)) newRange
+  where
+    keys = M.keysSet grid
+    (V2 xtl ytl) = minimumBy orderPoints keys
+    (V2 xbr ybr) = maximumBy orderPoints keys
+    newRange = [V2 x y | x <- [xtl - 2 .. xbr + 2], y <- [ytl - 2 .. ybr + 2]]
+```
+This function will enhance the existing grid by mapping over all of its keys and using the `iteration` to control whether default pixels are light or dark. The `expand` function is quite important. The idea is that each enhancement will make the 'known' grid grow in area, so each iteration needs to consider an area of points slightly bigger than the last one. To be precise, we need to consider all the points exactly two pixels to the left, right, top and bottom of the existing grid. That way, we get all the 'unknown' pixels which still resolve to a non-zero value when enhanced.
+
+And finally:
+```haskell
+runInput :: Int -> Input -> Grid Pixel
+runInput times (grid, iea) =
+  _grid $ iterate stepImageState initialState !! times
+  where
+    initialState = MkState grid iea 0
+```
+Hmm.. Quite a fiddly puzzle in my opinion. Ah well! They can't all be winners.
