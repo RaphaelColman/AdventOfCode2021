@@ -26,6 +26,7 @@
     - [Day 18](#day-18)
     - [Day 19](#day-19)
     - [Day 20](#day-20)
+    - [Day 21](#day-21)
 
 ### Overview
 This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
@@ -1724,3 +1725,41 @@ runInput times (grid, iea) =
     initialState = MkState grid iea 0
 ```
 Hmm.. Quite a fiddly puzzle in my opinion. Ah well! They can't all be winners.
+
+### Day 21
+This one was a head-spinner! I spent quite a long time just trying to decipher what the puzzler meant. Well, what part 2 meant. Let's quickly bash out part 1 so we can get on to [the good stuff.](https://media.giphy.com/media/510KemnengFPi/giphy.gif)
+We're playing a deterministic game of dice. The rule is, each player rolls three dice, adds the values together and moves that number of spaces along the board. The board wraps back around to 1 after 10. They add the value of the space they land on to their current score. Simple! Even simpler because there's no randomness. The dice are deterministic.
+```haskell
+data Player =
+  MkPlayer
+    { _value :: Integer
+    , _score :: Integer
+    }
+  deriving (Eq, Show, Ord)
+
+data Game =
+  MkGame
+    { _player1  :: Player
+    , _player2  :: Player
+    , _rolls    :: [Integer]
+    , _numRolls :: Integer
+    }
+  deriving (Eq)
+
+initGame :: Players -> Game
+initGame (player1, player2) =
+  MkGame (MkPlayer player1 0) (MkPlayer player2 0) rolls 0
+  where
+    rolls = map sum $ chunksOf 3 $ cycle [1 .. 100]
+```
+So each `Player` keeps track of where they are on the board (value) and their current score. In the `Game` type, we make `rolls` an infinite list of all the dice values we will ever have so we don't need to do any fiddly logic to figure out what the next dice rolls are. We also keep track of the total number of rolls we've had in the game, because we need that to multiply that by the score of the losing player.
+
+We define how to get from one game state to the next one:
+```haskell
+step :: Game -> Game
+step (MkGame (MkPlayer value score) player2 (thisRoll:rest) numRolls) =
+  let newValue = incrementValue value thisRoll
+      newScore = score + newValue
+   in MkGame player2 (MkPlayer newValue newScore) rest (numRolls + 3)
+```
+This is all pretty normal so far. The only thing to point out here is that the new state will have player1 and player2 swapped. That way, we can always use whichever player is in the `Player1` field as the player doing the dice rolling this turn.
