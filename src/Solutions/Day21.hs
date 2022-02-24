@@ -1,8 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Solutions.Day21
-  ( aoc21
-  ) where
+module Solutions.Day21 where
 
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions, printTestSolutions)
@@ -126,7 +124,7 @@ diracTurn (MkDG universes firstPlayer player1Wins player2Wins) =
     newUniverses = M.foldrWithKey go M.empty universes
     go :: Universe -> Integer -> Universes -> Universes
     go universe count universes =
-      let newUniverses = splitUniverse firstPlayer universe count
+      let newUniverses = M.map (* count) $ splitUniverse firstPlayer universe
        in M.unionWith (+) newUniverses universes
     (finished, remaining) = partitionKeys partitionFinished (+) newUniverses
     newP1Wins = M.findWithDefault 0 PLAYER1 finished + player1Wins
@@ -138,11 +136,10 @@ partitionFinished universe@(MkU (MkPlayer _ score1) (MkPlayer _ score2))
   | score2 >= 21 = Left PLAYER2
   | otherwise = Right universe
 
-splitUniverse :: Bool -> Universe -> Integer -> Universes
-splitUniverse isPlayer1 (MkU player1 player2) count =
-  M.map (* count) $ M.mapKeys go diracDiceRolls
+splitUniverse :: Bool -> Universe -> Universes
+splitUniverse isPlayer1 (MkU player1 player2) = M.mapKeys play diracDiceRolls
   where
-    go value =
+    play value =
       if isPlayer1
         then MkU (newPlayer value player1) player2
         else MkU player1 (newPlayer value player2)

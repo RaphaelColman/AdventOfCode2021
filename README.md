@@ -1756,6 +1756,13 @@ So each `Player` keeps track of where they are on the board (value) and their cu
 
 We define how to get from one game state to the next one:
 ```haskell
+incrementValue :: Integer -> Integer -> Integer
+incrementValue value amount =
+  let total = (value + amount) `mod` 10
+   in if total == 0
+        then 10
+        else total
+
 step :: Game -> Game
 step (MkGame (MkPlayer value score) player2 (thisRoll:rest) numRolls) =
   let newValue = incrementValue value thisRoll
@@ -1763,3 +1770,130 @@ step (MkGame (MkPlayer value score) player2 (thisRoll:rest) numRolls) =
    in MkGame player2 (MkPlayer newValue newScore) rest (numRolls + 3)
 ```
 This is all pretty normal so far. The only thing to point out here is that the new state will have player1 and player2 swapped. That way, we can always use whichever player is in the `Player1` field as the player doing the dice rolling this turn.
+
+A player has one when they reach a score of over 1000, but the puzzle wants us to get the loser's score, so we can simply define a function to extract the losing player's score from the game if there is one:
+```haskell
+loser :: Game -> Maybe (Integer, Integer)
+loser (MkGame (MkPlayer _ score1) (MkPlayer _ score2) _ numRolls)
+  | score1 >= 1000 = Just (score2, numRolls)
+  | score2 >= 1000 = Just (score1, numRolls)
+  | otherwise = Nothing
+```
+If there is no winner yet, we just return a `Nothing`. As usual, we can then just iterate by using recursion. We check for a loser, and if there isn't one we step the game state and try again:
+
+```haskell
+play :: Game -> Integer
+play game =
+  case loser game of
+    Just (losingScore, numRolls) -> losingScore * numRolls
+    Nothing                      -> step game & play
+```
+
+Now we get to the good bit! Part 2 changes the game - when you roll a 3-sided dice, you actually split your reality in to 3 separate universes, one which each possible value. You roll the dice three times, so all 3 versions of you will roll again, and then all 9 versions of you will roll to complete your turn. You'll have 27 universes at the end of the first turn! At the end of the other player's first turn, you'll have 3<sup>6</sup> = 729 different universes. 
+
+Our task is to find which player wins in more universes, and how many universes they win in. Keeping track of every universe and all its children individually is pretty unworkable. I didn't bother trying it, but I suspect it would grind to a halt. The first insight I had is that even though one turn spawns 27 universes, many of those universes are actually identical. For example:
+
+1 + 2 + 2 = 5\
+2 + 2 + 1 = 5\
+3 + 1 + 1 = 5\
+...\
+etc
+
+So we can actually represent our dice rolls as a frequency map:
+```haskell
+diracDiceRolls :: M.Map Integer Integer
+diracDiceRolls = freqs combos
+  where
+    combos = [sum [x, y, z] | x <- [1 .. 3], y <- [1 .. 3], z <- [1 .. 3]]
+```
+```
+λ: diracDiceRolls 
+fromList [(3,1),(4,3),(5,6),(6,7),(7,6),(8,3),(9,1)]
+```
+(so we get a total of 1 for 3 universes, a total of 3 for 4 universes etc). That means there are only 7 distinct universes, but with different counts which total 27.
+The way to do this, then, is to adopt the same approach to keep track of all our turns. We'll have a frequency map of universes, where each universe is a representation of player state (player score and space) and the count is the number of universes that state is currently represented in. Then, as we update our map, we can keep checking which games have finished, and keep track of those as well.
+
+First off: a universe will look like this:
+```haskell
+data Universe =
+  MkU
+    { _dPlayer1 :: Player --I've called it dPlayer so this field doesn't conflict with the Player function we generated earlier
+    , _dPlayer2 :: Player
+    }
+  deriving (Eq, Show, Ord)
+```
+Then our map will look like this:
+```haskell
+type Universes = M.Map Universe Integer
+```
+
+And finally our player state will look like this:
+```haskell
+data DiracGame =
+  MkDG
+    { _universes   :: Universes
+    , _firstPlayer :: Bool
+    , _player1Wins :: Integer
+    , _player2Wins :: Integer
+    }
+  deriving (Eq, Show)
+```
+Again, we can imagine 'stepping' the player state from one state to the next. Each step will simulate the different dice rolls, and update the map accordingly. Notice that we now need to keep track of whose turn it is using a boolean, whereas before we could just swap the places of the players.
+
+Let's start with a `splitUniverse` function, which, given a universe, returns a map of new universes based on the dice rolls.
+```haskell
+newPlayer :: Integer -> Player -> Player
+newPlayer value player =
+  let newValue = incrementValue (_value player) value
+      newScore = _score player + newValue
+   in MkPlayer newValue newScore
+
+splitUniverse :: Bool -> Universe -> Universes
+splitUniverse isPlayer1 (MkU player1 player2) = M.mapKeys play diracDiceRolls
+  where
+    play value =
+      if isPlayer1
+        then MkU (newPlayer value player1) player2
+        else MkU player1 (newPlayer value player2)
+```
+`newPlayer` is fairly self-explanatory. Given a player and value (dice roll), update the player's score and space. The `splitUniverse` function takes a boolean representing whether player1 is the current player and a current universe to split. It then creates map of universe to count by mapping over the keys of the `diracDiceRolls`
+
+Now we can create a map of split universes from a single one, we can define how to step from one game state to the next. The way I think of this is that we need to fold through our current frequency map of universes. For each distinct kind of universe, we need to calculate the new universes and their counts, and multiply those counts by the original. In other words, say I have 2 universes where player 1 is on space 8 and has exactly 30 points. The 7 distinct new universes all have their counts multiplied by 2, because we had 2 to begin with.
+```haskell
+diracTurn :: DiracGame -> DiracGame
+diracTurn (MkDG universes firstPlayer player1Wins player2Wins) =
+  MkDG remaining (not firstPlayer) newP1Wins newP2Wins
+  where
+    newUniverses = M.foldrWithKey go M.empty universes
+    go :: Universe -> Integer -> Universes -> Universes
+    go universe count universes =
+      let newUniverses = M.map (* count) $ splitUniverse firstPlayer universe
+       in M.unionWith (+) newUniverses universes
+    (finished, remaining) = partitionKeys partitionFinished (+) newUniverses
+    newP1Wins = M.findWithDefault 0 PLAYER1 finished + player1Wins
+    newP2Wins = M.findWithDefault 0 PLAYER2 finished + player2Wins
+
+partitionFinished :: Universe -> Either Winner Universe
+partitionFinished universe@(MkU (MkPlayer _ score1) (MkPlayer _ score2))
+  | score1 >= 21 = Left PLAYER1
+  | score2 >= 21 = Left PLAYER2
+  | otherwise = Right universe
+
+
+data Winner
+  = PLAYER1
+  | PLAYER2
+  deriving (Eq, Show, Ord)
+```
+So this function will do exactly that. It calls `splitUniverse` on each universe, and multiplies all the counts in the result by the counts in the original. It then uses `M.unionWith` to add those universes to the map. The other thing it does is to check for games which have finished (by checking if the score is over 21) and extracts the winning player from those games. `partitionKeys` is a really useful function for this - it will divide the contents of a map into two maps based on the result from a function you give it which returns an `Either` (in this case, the `partitionFinished` function).
+
+After that it's simple. As before, we define a recursive function in order to keep stepping the game state until there are no more universes to split, because they all consist of finished games.
+
+```haskell
+playDiracGame :: DiracGame -> Integer
+playDiracGame game@(MkDG universes _ p1W p2W)
+  | null universes = max p1W p2W
+  | otherwise = diracTurn game & playDiracGame
+```
+
+I thought it was interesting that the puzzle description didn't step through an example for part 2. I think it was intentional - most of the puzzle was not really writing the code. It was trying to understand how to keep track of all those split universes. An example might have given the game away.
