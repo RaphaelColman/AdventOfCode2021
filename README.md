@@ -27,6 +27,7 @@
     - [Day 19](#day-19)
     - [Day 20](#day-20)
     - [Day 21](#day-21)
+    - [Day 22](#day-22)
 
 ### Overview
 This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
@@ -1897,3 +1898,14 @@ playDiracGame game@(MkDG universes _ p1W p2W)
 ```
 
 I thought it was interesting that the puzzle description didn't step through an example for part 2. I think it was intentional - most of the puzzle was not really writing the code. It was trying to understand how to keep track of all those split universes. An example might have given the game away.
+
+### Day 22
+Here's the other puzzle where I have to credit out the author of [this repo](https://github.com/alexburlton/advent-of-code-beleaguered-badger). His solution is really clever, and I'm afraid I ended up reading it and just implementing in Haskell.
+
+The task is to run a list of 'reboot steps' on a reactor core (a 3-dimensional space). Each instruction is the bounding coordinates of a cuboid with a toggle: 'on' or 'off'. For example:
+```
+on x=10..12,y=10..12,z=10..12
+```
+Will set all points enclosed by that cuboid to 'on'. If any points are already on then they will not change. We have to count the number of cubes which are on at the end.
+
+My first pass at this puzzle was naive, but it worked for part 1. I just kept a set of all points that were 'on' and add or removed from the set accordingly with each instruction. That works for part 1, which restricts the area you have to deal with to only 1000000 points, so it's not much to keep track off. However, part 2 asks you to keep track of all possible points in the instruction set, which means the area gets too big to manage and that approach becomes impossibly slow.
