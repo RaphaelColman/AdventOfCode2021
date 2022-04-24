@@ -1908,4 +1908,19 @@ on x=10..12,y=10..12,z=10..12
 ```
 Will set all points enclosed by that cuboid to 'on'. If any points are already on then they will not change. We have to count the number of cubes which are on at the end.
 
-My first pass at this puzzle was naive, but it worked for part 1. I just kept a set of all points that were 'on' and add or removed from the set accordingly with each instruction. That works for part 1, which restricts the area you have to deal with to only 1000000 points, so it's not much to keep track off. However, part 2 asks you to keep track of all possible points in the instruction set, which means the area gets too big to manage and that approach becomes impossibly slow.
+My first pass at this puzzle was naive, but it worked for part 1. I just kept a set of all points that were 'on' and added or removed from the set accordingly with each instruction. That works for part 1, which restricts the area you have to deal with to only 1000000 points, so it's not much to keep track off. However, part 2 asks you to keep track of all possible points in the instruction set, which means the area gets too big to manage and that approach becomes impossibly slow.
+
+Instead of keeping track of all the points, our task instead is to aggregate all the instructions and just keep track of the areas of points which are on. For one single instruction, this is pretty easy. You just take the area of the square. For two it gets more complicated. What if the two areas overlap? If both instructions were 'on' then we can't just add the areas together because some points will already be on.
+
+The trick here is to derive new instructions from the ones you already have. Every time you have an intersection with a previous cuboid, you create an instruction representing just that intersection and what to do with it (whether to subtract that area or to add it). Then at the end, you fold all of the instructions together to get the total.
+
+Some diagrams might help here. I also thinks it helps to try this first in 2d with squares. Imagine first we have an instruction turning this 3x3 square 'on'.
+
+![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/main/res/diagrams/one_square.odg)
+
+If our next instruction is also 'on' and it intersects, then we need to create our own instruction to add to the list, which turns off that inersection. That way, we cancel out the fact that we've added some points twice.
+
+_insert another diagram here_
+
+Conversely, if we have an overlapping instruction which is 'off' (and which intersects), then we need to create our own instruction which turns the intersection on.
+NB: I'm not sure I get this now.

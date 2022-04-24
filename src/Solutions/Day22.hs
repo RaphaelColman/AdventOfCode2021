@@ -106,4 +106,4 @@ deriveArea = foldr go 0
       | otherwise = total - area cuboid
 
 runReboot :: [Instruction] -> Integer
-runReboot instructions = deriveArea $ foldl' applyInstruction [] instructions
+runReboot = deriveArea . foldl' applyInstruction [] 
