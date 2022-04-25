@@ -1916,11 +1916,94 @@ The trick here is to derive new instructions from the ones you already have. Eve
 
 Some diagrams might help here. I also thinks it helps to try this first in 2d with squares. Imagine first we have an instruction turning this 3x3 square 'on'.
 
-![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/main/res/diagrams/one_square.odg)
+![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/main/res/diagrams/one_on.png)
 
-If our next instruction is also 'on' and it intersects, then we need to create our own instruction to add to the list, which turns off that inersection. That way, we cancel out the fact that we've added some points twice.
+If our next instruction is also 'on' and it intersects, then we need to create our own instruction to add to the list, which turns off that intersection. That way, we cancel out the fact that we've added some points twice.
 
-_insert another diagram here_
+![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/main/res/diagrams/two_on.png)
 
-Conversely, if we have an overlapping instruction which is 'off' (and which intersects), then we need to create our own instruction which turns the intersection on.
-NB: I'm not sure I get this now.
+
+What if we are handling an instruction which turns points off? If it doesn't intersect with any existing instructions, then we don't care. It's turning points off which were already off, so we discard it. If it does intersect, then we need to worry about what it intersects with. Let's imagine that it intersects with a previous 'on' instruction:
+
+
+![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/main/res/diagrams/one_on_one_off.png)
+
+In that, case we derive an instruction for the intersection which just turns those points off. What if it intersects with a previous 'off' instruction?
+This is probably the least intuitive one. The only reason a previous instruction could be 'off' is if it is a derived one (remember, we normally discard the 'off' instructions entirely). We don't want to overestimate the area that we subtract from 'off' instructions, so any intersections are added as an 'on' instruction (so as before, we want to compensate for turning points off twice).
+
+![alt ""](https://github.com/RaphaelColman/AdventOfCode2021/blob/main/res/diagrams/two_off.png)
+
+
+So now we have some idea how to solve this, let's look at implementing it. As usual, we can use the lovely `Linear` library to represent points in space. I ended up with this:
+
+```haskell
+type Point = V3 Integer
+
+type PointRange = (Integer, Integer)
+
+data Cuboid =
+  MkCuboid
+    { _xRange :: PointRange
+    , _yRange :: PointRange
+    , _zRange :: PointRange
+    }
+  deriving (Eq, Show, Ord)
+
+data Instruction =
+  MkInstruction
+    { _on     :: Bool
+    , _cuboid :: Cuboid
+    }
+  deriving (Eq, Show, Ord)
+```
+
+Next, we need to be able to calculate the intersecting cuboid of two cuboids. If anyone knows a neater way to do it, then let me know!
+
+```haskell
+intersection :: Cuboid -> Cuboid -> Maybe Cuboid
+intersection (MkCuboid (xLeft1, xRight1) (yNear1, yFar1) (zBottom1, zTop1)) (MkCuboid (xLeft2, xRight2) (yNear2, yFar2) (zBottom2, zTop2))
+  | bottom > top = Nothing
+  | left > right = Nothing
+  | near > far = Nothing
+  | otherwise = Just $ MkCuboid (left, right) (near, far) (bottom, top)
+  where
+    bottom = max zBottom1 zBottom2
+    top = min zTop1 zTop2
+    left = max xLeft1 xLeft2
+    right = min xRight1 xRight2
+    near = max yNear1 yNear2
+    far = min yFar1 yFar2
+```
+
+Before we worry about deriving new instructions, lets get a general idea of what we'l be doing. We'll start with a list of instructions, and we'll have to 'apply' each one. What that means is that we'll be adding that instruction to a new list if it's 'on', and we'll also be adding any derived instructions we got from it. Once we have our new list of instructions (including the derived ones), we can simple add the area for the 'on' instructions and subtract the area for the 'off' instructions.
+
+```haskell
+type RebootState = [Instruction]
+deriveArea :: RebootState -> Integer
+deriveArea = foldr go 0
+  where
+    go (MkInstruction on cuboid) total
+      | on = total + area cuboid
+      | otherwise = total - area cuboid
+
+runReboot :: [Instruction] -> Integer
+runReboot = deriveArea . foldl' applyInstruction [] 
+```
+
+So the only thing we haven't defined here is `applyInstruction`. The way I think about it is that for any new instructions, we have to get all the interesections with preceeding instructions, then flip the 'on' value for the instruction with which we're intersecting. Basically, if the previous instruction was 'on', then we're adding a new one of 'off' and vice-versa.
+
+```haskell
+deriveExtraInstruction :: Instruction -> Instruction -> Maybe Instruction
+deriveExtraInstruction (MkInstruction _ cuboid1) (MkInstruction on cuboid2) =
+  MkInstruction (not on) <$> intersection cuboid1 cuboid2
+
+applyInstruction :: RebootState -> Instruction -> RebootState
+applyInstruction instructions instruction@(MkInstruction on _)
+  | on = instruction : newInstructions ++ instructions
+  | otherwise = instructions ++ newInstructions
+  where
+    newInstructions = mapMaybe (deriveExtraInstruction instruction) instructions
+```
+The fact the `intersection` method from earlier returns a `Maybe` is quite handy here when combined with `mapMaybe`, which will map a function over a list of elements and strip out any results which are a `Nothing`. As you can see, we always define our `newInstructions` instructions using the intersections with all previous instructions. Then if the new instruction is 'on', we add it to the head of the list (along with all the new instructions). If it was 'off' then we discard it.
+
+And that's it! A very complicated sounding problem, but with that need method of accumulating 'derived' instructions, the implementation is surprisingly simple.
