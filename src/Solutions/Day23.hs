@@ -5,22 +5,27 @@ module Solutions.Day23
   ) where
 
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
-                                      printSolutions)
-import           Common.Debugging
+                                      printSolutions, printTestSolutions)
+import           Common.Debugging    ()
 import           Common.Geometry     (Point, renderVectorMap)
 import           Common.ListUtils    (flexibleRange, singleton, window3)
 import           Common.MapUtils     (minimumValue)
 import qualified Common.SetUtils     as SU
-import           Control.Lens
+import           Control.Applicative ((<|>))
+import           Control.Lens        (makeLenses)
+import           Data.Char           (isLetter)
 import           Data.Foldable       (find, minimumBy, traverse_)
 import           Data.Function       (on)
 import qualified Data.Map            as M
 import           Data.Maybe          (isJust, isNothing, mapMaybe)
 import qualified Data.PSQueue        as PQ
 import qualified Data.Set            as S
-import           Debug.Trace
-import           Linear              (V2 (V2))
-import           Text.Trifecta       (Parser)
+import           Debug.Trace         (traceShow)
+import           Linear              (Metric (dot), V2 (V2))
+import           Text.Read           (Lexeme (Char))
+import           Text.Trifecta       (CharParsing (anyChar, char), Parser,
+                                      TokenParsing (token), charLiteral, count,
+                                      integer, letter, manyTill)
 
 data BurrowSpace
   = CorridorSpace Integer
@@ -61,19 +66,34 @@ makeLenses ''Amphipod
 
 aoc23 :: IO ()
 aoc23 = do
-  printSolutions 23 $ MkAoCSolution parseInput part1
-  printSolutions 23 $ MkAoCSolution parseInput part2
+  printTestSolutions 23 $ MkAoCSolution parseInput part1
+  printTestSolutions 23 $ MkAoCSolution parseInput part2
   where
     debugLn (MkMove state cost) = do
       putStrLn $ renderVectorMap $ renderBurrowState state
       print cost
 
-parseInput :: Parser String
-parseInput = pure "unimplemented"
+parseInput :: Parser BurrowState
+parseInput = do
+  podTypes <- count 8 untilLetter
+  pure $ S.fromList $ zipWith MkApod rooms podTypes
+  where
+    untilLetter :: Parser AmType
+    untilLetter = do
+      c <- anyChar
+      case c of
+        'A' -> pure A
+        'B' -> pure B
+        'C' -> pure C
+        'D' -> pure D
+        _   -> untilLetter
+    rooms = zipWith Room (cycle [A, B, C, D]) $ cycle [1, 1, 1, 1, 2, 2, 2, 2]
 
-part1 str = dijkstraPQ initBurrowState1
+part1 :: BurrowState -> Maybe Integer
+part1 = dijkstraPQ
 
-part2 str = dijkstraPQ initBurrowState2
+part2 :: BurrowState -> Maybe Integer
+part2 = dijkstraPQ
 
 testBurrow :: BurrowState
 testBurrow = S.fromList $ amphipods ++ extraAmphipods
@@ -92,25 +112,6 @@ movementCost aType =
     B -> 10
     C -> 100
     D -> 1000
-
-initBurrowState1 :: BurrowState
-initBurrowState1 = S.fromList amphipods
-  where
-    amphipods = zipWith MkApod rooms podTypes
-    --podTypes = [B, A, C, D, B, C, D, A]
-    podTypes = [D, D, A, C, C, B, A, B]
-    rooms = zipWith Room [A, A, B, B, C, C, D, D] $ cycle [1, 2]
-
-initBurrowState2 :: BurrowState
-initBurrowState2 = S.fromList $ amphipods ++ extraAmphipods
-  where
-    amphipods = zipWith MkApod rooms podTypes
-    extraAmphipods = zipWith MkApod extraRoomSpaces extraPodTypes
-    --podTypes = [B, A, C, D, B, C, D, A]
-    podTypes = [D, D, A, C, C, B, A, B]
-    extraPodTypes = [D, D, C, B, B, A, A, C]
-    extraRoomSpaces = zipWith Room [A, A, B, B, C, C, D, D] $ cycle [2, 3]
-    rooms = zipWith Room [A, A, B, B, C, C, D, D] $ cycle [1, 4]
 
 burrowComplete :: BurrowState -> Bool
 burrowComplete bs = all (`isFinished` bs) bs
@@ -150,8 +151,6 @@ destinationRoomSpace (MkApod pos aType) bs
       mapMaybe ((`getOccupant` bs) . Room aType) [1 .. roomDepth]
     roomDepth = toInteger $ length $ S.filter ((== aType) . _amType) bs
 
---Maybe this would be quicker if I enumerated all the different moves individually for each amphipod (rather than dividing them into room and corridor moves)
---Maybe also quicker if I rule out 'blocked amphipods'
 nextMoves :: BurrowState -> S.Set Move
 nextMoves bs = ($!) S.union toRoomMoves allCorridorMoves
   where
@@ -185,10 +184,6 @@ corridorMoves aPod@(MkApod pos@(Room rType rNum) aType) bs =
             else Nothing
 corridorMoves _ _ = []
 
---The trace is defo centered around the S.notMember bit, so not sure it's to do with minimumValue
--- Maybe can do this with a priority queue. So we track tentative distances separately to the queue of next node to pick up.
---This implementation looks great: https://hackage.haskell.org/package/PSQueue-1.1.0.1/docs/Data-PSQueue.html
---I'm sure I'm missing the bit where you add the childCost to the current cost...
 dijkstraPQ :: BurrowState -> Maybe Integer
 dijkstraPQ bs = go (PQ.singleton bs 0) M.empty S.empty
   where
