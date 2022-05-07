@@ -28,6 +28,7 @@
     - [Day 20](#day-20)
     - [Day 21](#day-21)
     - [Day 22](#day-22)
+    - [Day 23](#day-23)
 
 ### Overview
 This is inspired by mstksg's fantastic Haskell solutions found [here](https://github.com/mstksg/advent-of-code-2020).
@@ -2004,6 +2005,26 @@ applyInstruction instructions instruction@(MkInstruction on _)
   where
     newInstructions = mapMaybe (deriveExtraInstruction instruction) instructions
 ```
+
 The fact the `intersection` method from earlier returns a `Maybe` is quite handy here when combined with `mapMaybe`, which will map a function over a list of elements and strip out any results which are a `Nothing`. As you can see, we always define our `newInstructions` instructions using the intersections with all previous instructions. Then if the new instruction is 'on', we add it to the head of the list (along with all the new instructions). If it was 'off' then we discard it.
 
 And that's it! A very complicated sounding problem, but with that need method of accumulating 'derived' instructions, the implementation is surprisingly simple.
+
+### Day 23
+Oh my! This was by far the hardest puzzle of the lot. It's that tough combination of edge-cases and figuring out how to optimise to make it anywhere near fast enough. I was pretty pleased with my final solution, although it took me a really long time to write. Also, this puzzle forced me to learn about how to profile Haskell which is bound to be useful for next year.
+
+There are so many edge cases and instructions that I'm not going to bother rehashing the puzzle parameters here. The hand-wavy summary is that there's a burrow with pairs of different kinds of amphipods, and they have to move around in the burrow until they are in the right rooms. They can't move through each other, and some require more energy to move than others. This reminded me a lot of those super-tricky [sliding block puzzles](https://images-na.ssl-images-amazon.com/images/I/81X%2BADjlALL._AC_SL1500_.jpg).
+
+The first realisation I had was that it would be much better to stop trying to model this as a 2d space with coordinates and vectors. The would add a huge amount of logic to the program, and would be almost useless because so many of the spaces in the burrow are 'special'. Amphipods will behave differently depending on what space they are in, and you would have to encode that in somehow. There are two different kinds of space:
+* Corridor space: There are 11 of these, but some of there are immediately outside rooms, so amphipods cannot stop on them.
+* Rooms - Rooms have a 'type' (A,B,C or D) and also a 'depth' ie depth of 1 is the room space adjacent to the corridor, and depth of is further away from the corridor.
+
+Dipping our toes in, it makes sense to have a model like this:
+```haskell
+data AmType = A | B | C | D deriving (Enum, Eq, Ord, Show)
+
+data BurrowSpace
+  = CorridorSpace Integer
+  | Room AmType Integer
+  deriving (Eq, Ord, Show)
+```

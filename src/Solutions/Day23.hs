@@ -1,4 +1,5 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DataKinds #-}
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 
 module Solutions.Day23
   ( aoc23
@@ -24,45 +25,32 @@ import           Debug.Trace         (traceShow)
 import           Linear              (Metric (dot), V2 (V2))
 import           Text.Read           (Lexeme (Char))
 import           Text.Trifecta       (CharParsing (anyChar, char), Parser,
-                                      TokenParsing (token), charLiteral, count,
-                                      integer, letter, manyTill)
+                                      Parsing (skipMany), TokenParsing (token),
+                                      charLiteral, count, integer, letter,
+                                      manyTill, upper)
 
 data BurrowSpace
   = CorridorSpace Integer
   | Room AmType Integer
-  deriving (Eq, Show, Ord)
+  deriving (Eq, Ord, Show)
 
-data AmType
-  = A
-  | B
-  | C
-  | D
-  deriving (Eq, Show, Ord, Enum)
+data AmType = A | B | C | D deriving (Enum, Eq, Ord, Show)
 
-type Burrow = M.Map BurrowSpace (S.Set BurrowSpace)
-
-data Amphipod =
-  MkApod
-    { _position :: BurrowSpace
-    , _amType   :: AmType
-    }
-  deriving (Eq, Show, Ord)
-
-data MovingState
-  = RoomToCorridor
-  | CorridorToRoom
-  deriving (Eq, Show, Enum, Ord)
+data Amphipod
+  = MkApod
+      { _position :: BurrowSpace
+      , _amType   :: AmType
+      }
+  deriving (Eq, Ord, Show)
 
 type BurrowState = S.Set Amphipod
 
-data Move =
-  MkMove
-    { _state :: BurrowState
-    , _cost  :: Integer
-    }
-  deriving (Eq, Show, Ord)
-
-makeLenses ''Amphipod
+data Move
+  = MkMove
+      { _state :: BurrowState
+      , _cost  :: Integer
+      }
+  deriving (Eq, Ord, Show)
 
 aoc23 :: IO ()
 aoc23 = do
@@ -87,23 +75,20 @@ parseInput = do
         'C' -> pure C
         'D' -> pure D
         _   -> untilLetter
-    rooms = zipWith Room (cycle [A, B, C, D]) $ cycle [1, 1, 1, 1, 2, 2, 2, 2]
+    rooms = zipWith Room (cycle [A, B, C, D]) [1, 1, 1, 1, 2, 2, 2, 2]
 
 part1 :: BurrowState -> Maybe Integer
 part1 = dijkstraPQ
 
 part2 :: BurrowState -> Maybe Integer
-part2 = dijkstraPQ
+part2 = dijkstraPQ . unfoldApods
 
-testBurrow :: BurrowState
-testBurrow = S.fromList $ amphipods ++ extraAmphipods
-  where
-    amphipods = zipWith MkApod rooms podTypes
-    extraAmphipods = zipWith MkApod extraRoomSpaces extraPodTypes
-    podTypes = [A, A, B, B, C, C, D, D]
-    extraPodTypes = [A, A, B, B, C, C, D, D]
-    extraRoomSpaces = zipWith Room [A, A, B, B, C, C, D, D] $ cycle [2, 3]
-    rooms = zipWith Room [A, A, B, B, C, C, D, D] $ cycle [1, 4]
+unfoldApods :: BurrowState -> BurrowState
+unfoldApods bs = S.unions [depth1, extraApods, moveTo4 `S.map` depth2]
+  where extraApods = S.fromList $ zipWith MkApod middleRooms [D,D,C,B,B,A,A,C]
+        middleRooms = zipWith Room [A,A,B,B,C,C,D,D] $ cycle [2,3]
+        (depth1, depth2) = S.partition (\(MkApod (Room _ depth) _) -> depth == 1) bs
+        moveTo4 (MkApod (Room rType depth) aType) = MkApod (Room rType 4) aType
 
 movementCost :: AmType -> Integer
 movementCost aType =
@@ -193,25 +178,25 @@ dijkstraPQ bs = go (PQ.singleton bs 0) M.empty S.empty
             traceShow cost $ maybe True (> cost) $ M.lookup current costs
       if burrowComplete current
         then pure cost
-        else do
+        else
           if current `S.notMember` visited && isLowerCost
-            then do
+            then
               let newVisited = S.insert current visited
-              let newCosts = M.insert current cost costs
-              let unvisitedChildren =
+                  newCosts = M.insert current cost costs
+                  unvisitedChildren =
                     S.filter
                       (\(MkMove state cost) -> state `S.notMember` visited) $
                     nextMoves current
-              let newPQ =
+                  newPQ =
                     S.fold
                       (\(MkMove state' cost') pq' ->
                          PQ.insertWith min state' (cost' + cost) pq')
                       pq
                       unvisitedChildren
-              ($!) go newPQ newCosts newVisited
+              in ($!) go newPQ newCosts newVisited
             else ($!) go remainingQueue costs visited
 
---Route from start node to end node (including start and end ndoes)
+--Route from start node to end node (including start and end nodes)
 --This probably does not have to be in order and can be simplified
 route :: BurrowSpace -> BurrowSpace -> [BurrowSpace]
 route (Room aType rNum) (CorridorSpace cNum) = roomStep ++ corridorSteps
@@ -256,7 +241,6 @@ renderBurrow = M.union corridorAndRooms entireGrid
       M.fromList $ zip [V2 x y | x <- [0 .. 12], y <- [0 .. 4]] $ repeat '#'
 
 renderBurrowState :: BurrowState -> M.Map Point Char
---renderBurrowState bs = allApods
 renderBurrowState bs = M.union allApods renderBurrow
   where
     allApods =
