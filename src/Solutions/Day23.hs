@@ -1,9 +1,10 @@
 {-# LANGUAGE DataKinds #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -Wno-deferred-out-of-scope-variables #-}
 
 module Solutions.Day23
-  ( aoc23
-  ) where
+   where
 
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions, printTestSolutions)
@@ -13,7 +14,7 @@ import           Common.ListUtils    (flexibleRange, singleton, window3)
 import           Common.MapUtils     (minimumValue)
 import qualified Common.SetUtils     as SU
 import           Control.Applicative ((<|>))
-import           Control.Lens        (makeLenses)
+import           Control.Lens        (makeLenses, over)
 import           Data.Char           (isLetter)
 import           Data.Foldable       (find, minimumBy, traverse_)
 import           Data.Function       (on)
@@ -30,8 +31,8 @@ import           Text.Trifecta       (CharParsing (anyChar, char), Parser,
                                       manyTill, upper)
 
 data BurrowSpace
-  = CorridorSpace Integer
-  | Room AmType Integer
+  = CorridorSpace { _column :: Integer }
+  | Room { _roomType :: AmType, _depth :: Integer }
   deriving (Eq, Ord, Show)
 
 data AmType = A | B | C | D deriving (Enum, Eq, Ord, Show)
@@ -51,6 +52,9 @@ data Move
       , _cost  :: Integer
       }
   deriving (Eq, Ord, Show)
+
+makeLenses ''BurrowSpace
+makeLenses ''Amphipod
 
 aoc23 :: IO ()
 aoc23 = do
@@ -88,7 +92,7 @@ unfoldApods bs = S.unions [depth1, extraApods, moveTo4 `S.map` depth2]
   where extraApods = S.fromList $ zipWith MkApod middleRooms [D,D,C,B,B,A,A,C]
         middleRooms = zipWith Room [A,A,B,B,C,C,D,D] $ cycle [2,3]
         (depth1, depth2) = S.partition (\(MkApod (Room _ depth) _) -> depth == 1) bs
-        moveTo4 (MkApod (Room rType depth) aType) = MkApod (Room rType 4) aType
+        moveTo4 = over (position . depth) (const 4)
 
 movementCost :: AmType -> Integer
 movementCost aType =
