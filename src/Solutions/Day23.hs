@@ -197,7 +197,6 @@ dijkstraPQ bs = go (PQ.singleton bs 0) M.empty S.empty
             else ($!) go remainingQueue costs visited
 
 --Route from start node to end node (including start and end nodes)
---This probably does not have to be in order and can be simplified
 route :: BurrowSpace -> BurrowSpace -> [BurrowSpace]
 route (Room aType rNum) (CorridorSpace cNum) = roomStep ++ corridorSteps
   where

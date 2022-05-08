@@ -2028,3 +2028,71 @@ data BurrowSpace
   | Room AmType Integer
   deriving (Eq, Ord, Show)
 ```
+
+The BurrowSpace type has two constructors: Room (which takes a type and a 'depth') and Corridor (which takes a number where 0 is the one furthest to the left, and 10 is the one furthest to the right).
+
+For part 1, we have 8 amphipods to keep track of. I toyed with some complicated modelling where the amphipod knows a lot about its state (ie. whether it's moving or stopped etc), and I eventually found that it gets really complicated. Remember, the puzzle specifies that the amphipod can only stop once. Once it starts moving again, it has to be able to reach its destination room. I found it was better to model that later on in the function we'll eventually write to figure out the next possible moves for the amphipod. Best to keep the internal state of the amphipod simple in the meantime:
+```haskell
+data Amphipod
+  = MkApod
+      { _position :: BurrowSpace
+      , _amType   :: AmType
+      }
+  deriving (Eq, Ord, Show)
+
+type BurrowState = S.Set Amphipod
+```
+It turns out the state of the burrow is just the set of all 8 Amphipods. We don't need to embed the rooms or corridors in our state.
+
+NB: This might not be totally in the spirit of type-driven Haskell. It's quite easy to create a `BurrowState` which is totally invalid - for example, by putting two amphipods in the same space. On the other hand, it is a very simple data model to use, which will help us later on. 
+
+But how do we actually solve this thing? The amphipods can be in many different states (some in their rooms, some in the corridor etc) and you can think of each state as a node a graph. Getting from one state to another (eg, an amphipod moving from its room to the corridor) incurs a certain cost, which is the weight of the edge between the two nodes (the old state and the new one). So we need to find the lowest-cost route from the starting node (our puzzle input) to the 'finishing' node (where all the amphipods are in the correct room). Sound familiar? It should do! We can solve this puzzle the same way we solved day 15: with Dijstra's algorithm!
+
+For day 15, we had a ready-made graph, but we don't actually need that to solve the puzzle. We just need a function which, given a `BurrowState`, gives us all the neighbouring nodes (possible moves) along with their costs. We'll start by defining a move:
+```haskell
+data Move
+  = MkMove
+      { _state :: BurrowState
+      , _cost  :: Integer
+      }
+  deriving (Eq, Ord, Show)
+
+```
+The core function which gives us our neighbour nodes will have a type signature like this:
+```haskell
+nextMoves :: BurrowState -> S.Set Move
+```
+We're not going to implement it yet, because there's a lot of logic to consider. To start with: let's figure out how to calculate your route from one space to another. There are really only three kinds of move to consider: from a room straight to another room, from a corridor to a room, and from a room to a corridor. As we have such a simple data model, we don't need to do any actual pathfinding. For example, we can easily navigate from a corridor space to a room by enumerating all the corridor spaces in between the the start point and the one outside the destination room, and then tacking on the room steps at the end. The admittedly verbose solution I wrote looks like this:
+```haskell
+--Route from start node to end node (including start and end nodes)
+route :: BurrowSpace -> BurrowSpace -> [BurrowSpace]
+route (Room aType rNum) (CorridorSpace cNum) = roomStep ++ corridorSteps
+  where
+    corridorSteps =
+      map CorridorSpace $ flexibleRange (aTypeToCorridorNum aType) cNum
+    roomStep = map (Room aType) $ flexibleRange rNum 1
+route (CorridorSpace cNum) (Room aType rNum) = corridorSteps ++ roomStep
+  where
+    corridorSteps =
+      map CorridorSpace $ flexibleRange cNum (aTypeToCorridorNum aType)
+    roomStep = map (Room aType) [1 .. rNum]
+route (Room aType1 rNum1) (Room aType2 rNum2) =
+  roomStepOut ++ corridorSteps ++ roomStepIn
+  where
+    corridorSteps =
+      map CorridorSpace $
+      flexibleRange (aTypeToCorridorNum aType1) (aTypeToCorridorNum aType2)
+    roomStepOut = map (Room aType1) $ flexibleRange rNum1 1
+    roomStepIn = map (Room aType2) [1 .. rNum2]
+route (CorridorSpace _) (CorridorSpace _) =
+  error "Should not be moving from one corridor space to another"
+
+aTypeToCorridorNum :: AmType -> Integer
+aTypeToCorridorNum aType =
+  case aType of
+    A -> 2
+    B -> 4
+    C -> 6
+    D -> 8
+```
+It uses `flexibleRange`, which is a utility function I wrote for day 5 to enumerate from lower to higher numbers or vice-versa.
