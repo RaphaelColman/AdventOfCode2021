@@ -2179,4 +2179,61 @@ isFinished (MkApod position amType) bs =
 ```
 
 Ok, now it gets _really_ tricky. We finally have our means of calculating neighbouring nodes given a node (a `BurrowState`), which means we can implement Dijkstra's algorithm again. I pretty much copied what I did last time, so my first pass looked something like this:
+```haskell
+dijkstra :: BurrowState -> Integer
+dijkstra bs = go bs (M.fromList [(bs, 0)]) S.empty
+  where
+    go current tDistances visited
+      | burrowComplete current = tDistances M.! current
+      | otherwise = ($!) go minNode newTDistances newVisited
+      where
+        unvisitedChildren =
+          S.filter (\(MkMove state cost) -> not (state `S.member` visited)) $
+          nextMoves current
+        distances =
+          M.mapKeys _state $
+          M.fromSet
+            (\(MkMove state cost) -> cost + tDistances M.! current)
+            unvisitedChildren
+        newTDistances = M.unionWith min distances tDistances
+        (minNode, minEnergy) =
+          minimumValue $
+          M.filterWithKey (\k v -> k `S.notMember` newVisited) newTDistances --According the profile, this is the most expensive bit.  Could it be that `minimumValue`  turns it into a list of tuples?
+        newVisited = S.insert current visited
+```
+This should look pretty familiar. If doesn't have a look at (Dijkstra's algorithm)[https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm] on wikipedia. Perhaps also have a look at my write up for day 15.
 
+It turns out that this implementation is still too slow! Even on the test input, it grinds almost to a halt well before it would get to the solution. To be honest, normally when this happens in Advent of Code, I'm not particularly methodical. I make a blind guess as to what could be slowing my program down, then I spend some time implementation a more efficient solution based on that hair-brained assumption and hope for the best. But here I couldn't even do that. Dijkstra is supposed to be fast! After staring at it for some time, I realised I had no choice but to profile the application to get a concrete answer for what was being so slow. Fortunately for me, the tooling around profiling is really easy to use. First, you build the application with profiling enabled:
+
+```bash
+$ stack --profile build
+```
+Then you run the application as an executable, but passing in the --profile flag (plus some other ones whch I got from the stack website).
+```bash
+$ stack --profile exec -- AdventOfCode2021-exe +RTS -p
+```
+
+This runs the application and produces a <executable>.prof file with useful information about where your application spends most of its time. The first few lines of mine looked like this:
+
+```
+	Sat May 14 18:33 2022 Time and Allocation Profiling Report  (Final)
+
+	   AdventOfCode2021-exe +RTS -N -p -RTS
+
+	total time  =       39.25 secs   (133829 ticks @ 1000 us, 12 processors)
+	total alloc = 214,868,095,992 bytes  (excludes profiling overheads)
+
+COST CENTRE         MODULE          SRC                                      %time %alloc
+
+dijkstra.go.(...).\ Solutions.Day23 src/Solutions/Day23.hs:195:36-61          77.1   98.5
+compare             Solutions.Day23 src/Solutions/Day23.hs:25:23-25           11.9    0.0
+compare             Solutions.Day23 src/Solutions/Day23.hs:41:23-25            6.1    0.0
+compare             Solutions.Day23 src/Solutions/Day23.hs:32:23-25            2.0    0.0
+dijkstra.go.(...)   Solutions.Day23 src/Solutions/Day23.hs:(193,9)-(195,76)    1.7    0.3
+
+```
+
+After that it goes into a detailed breakdown of all the function calls and their hierarchy. Fortunately, we don't need to go into that to see the problem. As you can see from the report, we spend most of our time in line 195, columns 36-61, which is this:
+```haskell
+M.filterWithKey (\k v -> k `S.notMember` newVisited) newTDistances
+```
