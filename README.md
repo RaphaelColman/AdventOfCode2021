@@ -2046,7 +2046,7 @@ It turns out the state of the burrow is just the set of all 8 Amphipods. We don'
 
 NB: This might not be totally in the spirit of type-driven Haskell. It's quite easy to create a `BurrowState` which is totally invalid - for example, by putting two amphipods in the same space. On the other hand, it is a very simple data model to use, which will help us later on. 
 
-But how do we actually solve this thing? The amphipods can be in many different states (some in their rooms, some in the corridor etc) and you can think of each state as a node a graph. Getting from one state to another (eg, an amphipod moving from its room to the corridor) incurs a certain cost, which is the weight of the edge between the two nodes (the old state and the new one). So we need to find the lowest-cost route from the starting node (our puzzle input) to the 'finishing' node (where all the amphipods are in the correct room). Sound familiar? It should do! We can solve this puzzle the same way we solved day 15: with Dijstra's algorithm!
+But how do we actually solve this thing? The amphipods can be in many different states (some in their rooms, some in the corridor etc) and you can think of each state as a node a graph. Getting from one state to another (eg, an amphipod moving from its room to the corridor) incurs a certain cost, which is the weight of the edge between the two nodes (the old state and the new one). So we need to find the lowest-cost route from the starting node (our puzzle input) to the 'finishing' node (where all the amphipods are in the correct room). Sound familiar? It should do! We can solve this puzzle the same way we solved day 15: with Dijkstra's algorithm!
 
 For day 15, we had a ready-made graph, but we don't actually need that to solve the puzzle. We just need a function which, given a `BurrowState`, gives us all the neighbouring nodes (possible moves) along with their costs. We'll start by defining a move:
 ```haskell
@@ -2152,8 +2152,6 @@ corridorMoves aPod@(MkApod pos@(Room rType rNum) aType) bs =
             then Just (MkMove newState cost)
             else Nothing
 corridorMoves _ _ = []
-
-haskell
 ```
 
 We can combine these functions to work out all the possible next moves from one burrow state. Keep in mind: we only want to enumerate moves for 'moveable' amphipods ie. Amphipods that have not already reached their destination room. An amphipod who is in its own room, but in the way of another one which needs to get out does _not_ count as finished.
@@ -2200,8 +2198,11 @@ dijkstra bs = go bs (M.fromList [(bs, 0)]) S.empty
           minimumValue $
           M.filterWithKey (\k v -> k `S.notMember` newVisited) newTDistances --According the profile, this is the most expensive bit.  Could it be that `minimumValue`  turns it into a list of tuples?
         newVisited = S.insert current visited
+
+burrowComplete :: BurrowState -> Bool
+burrowComplete bs = all (`isFinished` bs) bs
 ```
-This should look pretty familiar. If doesn't have a look at (Dijkstra's algorithm)[https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm] on wikipedia. Perhaps also have a look at my write up for day 15.
+This should look pretty familiar. If doesn't have a look at [Dijkstra's algorithm](https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm) on wikipedia. Perhaps also have a look at my write up for day 15.
 
 It turns out that this implementation is still too slow! Even on the test input, it grinds almost to a halt well before it would get to the solution. To be honest, normally when this happens in Advent of Code, I'm not particularly methodical. I make a blind guess as to what could be slowing my program down, then I spend some time implementation a more efficient solution based on that hair-brained assumption and hope for the best. But here I couldn't even do that. Dijkstra is supposed to be fast! After staring at it for some time, I realised I had no choice but to profile the application to get a concrete answer for what was being so slow. Fortunately for me, the tooling around profiling is really easy to use. First, you build the application with profiling enabled:
 
@@ -2216,8 +2217,6 @@ $ stack --profile exec -- AdventOfCode2021-exe +RTS -p
 This runs the application and produces a <executable>.prof file with useful information about where your application spends most of its time. The first few lines of mine looked like this:
 
 ```
-	Sat May 14 18:33 2022 Time and Allocation Profiling Report  (Final)
-
 	   AdventOfCode2021-exe +RTS -N -p -RTS
 
 	total time  =       39.25 secs   (133829 ticks @ 1000 us, 12 processors)
@@ -2237,3 +2236,84 @@ After that it goes into a detailed breakdown of all the function calls and their
 ```haskell
 M.filterWithKey (\k v -> k `S.notMember` newVisited) newTDistances
 ```
+
+So what's going on here? We're spending almost all our time in this lambda expression, which is used to filter the "tentative distances" map to just the ones for nodes we haven't visited. This gives us a little clue - that tentative distances map can become absolutely huge. Filtering through it on each iteration is not going to be quick. It might help if we look at the context it's being called in:
+
+```haskell
+minimumValue $ 
+M.filterWithKey (\k v -> k `S.notMember` newVisited) newTDistances
+
+--from my helper functions: Common.MapUtils
+minimumValue :: (Ord a) => M.Map k a -> (k, a)
+minimumValue = minimumBy (compare `on` snd) . M.toList
+```
+Now it should make more sense. We have a potentially huge map of node -> 'tentative distance', and for each iteration we're trying to get the minimum value. It's not indexed in any way to help us do that, so `minumimValue` converts the map to a list and traverses the entire list each time. That's why we spend so much time in our filtering lambda: converting the map to a list and evaluating each member forces haskell to evaluate the filter for each element.
+
+I did some googling, and it turns out this is a common problem with implementations of this algorithm. One solution (mentioned on the wikipedia page) is to use a priority queue to implement that algorithm instead.
+
+What's a priority queue? It's a simple data structure, where you you can insert items with an associated priority. Popping the item of least priority from the queue is always fast (which, in my head, is quite confusing. Surely the highest priority items would be the fastest to get?!?). 
+
+You can fix the problem of a massive tentative distances map by using a priority queue instead. I ended up watching [this video](https://www.youtube.com/watch?v=CerlT7tTZfY) to get an idea of how it works. I shall explain the process here, but if you're anything like me you might need to stare at it for a while to get clear in your head why it's actually doing exactly the same thing that our original Dijkstra implementation is doing.
+
+Setup:
+Create a priority queue with only one item in: your starting node, and a cost of 0.
+Create a map of node to cost (starts empty).
+Create a set of nodes we've visited (starts empty)
+1. Pop the top item from the queue and look at its cost. If it's the same as our finishing node, then we're finished. Just use the associated cost.
+2. If not, we need to do more work. Check the 'visited' nodes. If we've visited it before, then discard this item and move to the next one in the queue.
+3. If we haven't visited, check the cost we found with the item against the one in our map (this is like the tentative distances map from before). If the one in map is lower, then discard this item and continue with the next item in the queue.
+4. If the cost in the queue is lower than the one in the map, then we insert this node into our visited set. We also insert its cost into our costs map. Then we get all the neighbour nodes which we haven't visited yet, and insert them (along with their costs) into the priority queue.
+5. Now we have an updated queue, cost map and visited nodes set, repeat from step 1.
+
+
+I recommend watching the youtube video if you're struggling to visualise how this is the same as Dijkstra. I really needed it. So with that in mind, first we need a priority queue of some sort. This is Haskell, so of course there are a bunch choices we can use. I opted for [PSQueue](https://hackage.haskell.org/package/PSQueue-1.1.1) in the end. I think some other implementations might have been faster, because this one also allows you look up by the element itself rather than just pop the lowest priority one from the top. However, the docs are easy to understand and the interface is easy to use, so it's good enough!
+
+Now, we need to redefine our Dijkstra algorithm using the priority queue.
+```haskell
+dijkstraPQ :: BurrowState -> Maybe Integer
+dijkstraPQ bs = go (PQ.singleton bs 0) M.empty S.empty
+  where
+    go pq costs visited = do
+      (current PQ.:-> cost, remainingQueue) <- PQ.minView pq
+      let isLowerCost =
+            traceShow cost $ maybe True (> cost) $ M.lookup current costs
+      if burrowComplete current
+        then pure cost
+        else
+          if current `S.notMember` visited && isLowerCost
+            then
+              let newVisited = S.insert current visited
+                  newCosts = M.insert current cost costs
+                  unvisitedChildren =
+                    S.filter
+                      (\(MkMove state cost) -> state `S.notMember` visited) $
+                    nextMoves current
+                  newPQ =
+                    S.fold
+                      (\(MkMove state' cost') pq' ->
+                         PQ.insertWith min state' (cost' + cost) pq')
+                      pq
+                      unvisitedChildren
+              in ($!) go newPQ newCosts newVisited
+            else ($!) go remainingQueue costs visited
+```
+
+The `minView` function allows us to extract a tuple of the lowest cost element and the rest of the queue. The funky `PQ.:->` is just some pattern matching. `:->` is the operator the PSQueue uses to bind a key to its cost.
+Once we have our lowest cost item from the queue, we first look in the map to see if it's lower than the one from our map. We use the `maybe` function to default to `True` if we couldn't find it in the map at all.
+Then, assuming we haven't hit our base case (the burrow is complete) and we haven't already visited this node, we perform steps 4 and 5. Notice how we enumerate the `nextMoves`, filter out the ones we don't need (they might result in states which we've already visited) and insert them all into the queue with `S.fold` (fold for sets).
+
+And so after a _lot_ of trouble, we finally have an implementation which is fast enough. It still takes ~2 minutes on my pc, but I think it's let down by the slightly slow Priority Queue implementation (which takes O(log n) time to call `minView`).
+
+
+Part 2, thankfully, just involves running the puzzle on a bigger input. It turns out the paper was folded and there are actually 4 amphipods in each room, not two. I wrote this `unfoldApods` function to insert the extra ones:
+```haskell
+unfoldApods :: BurrowState -> BurrowState
+unfoldApods bs = S.unions [depth1, extraApods, moveTo4 `S.map` depth2]
+  where extraApods = S.fromList $ zipWith MkApod middleRooms [D,D,C,B,B,A,A,C]
+        middleRooms = zipWith Room [A,A,B,B,C,C,D,D] $ cycle [2,3]
+        (depth1, depth2) = S.partition (\(MkApod (Room _ depth) _) -> depth == 1) bs
+        moveTo4 = over (position . depth) (const 4)
+```
+Which isn't all that interesting, except that it uses `Control.Lens` to modify existing Amphipods, which I thought was pretty cool.
+
+Definitely the hardest puzzle I've ever attempted in Advent of Code. I learned a lot from doing it though, and would be super confident implement Dijkstra again the next time round!

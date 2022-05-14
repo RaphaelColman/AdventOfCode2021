@@ -174,7 +174,7 @@ corridorMoves aPod@(MkApod pos@(Room rType rNum) aType) bs =
 corridorMoves _ _ = []
 
 dijkstraPQ :: BurrowState -> Maybe Integer
-dijkstraPQ bs = go (PQ.singleton bs 0) M.empty S.empty
+dijkstraPQ bs = go (PQ.singleton bs 0) mempty mempty
   where
     go pq costs visited = do
       (current PQ.:-> cost, remainingQueue) <- PQ.minView pq
