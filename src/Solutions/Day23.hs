@@ -212,14 +212,10 @@ route (CorridorSpace cNum) (Room aType rNum) = corridorSteps ++ roomStep
     corridorSteps =
       map CorridorSpace $ flexibleRange cNum (aTypeToCorridorNum aType)
     roomStep = map (Room aType) [1 .. rNum]
-route (Room aType1 rNum1) (Room aType2 rNum2) =
-  roomStepOut ++ corridorSteps ++ roomStepIn
+route r1@(Room aType1 rNum1) r2@(Room aType2 rNum2) =
+  tail (route r1 nearestCorridorSpace) ++ route nearestCorridorSpace r2
   where
-    corridorSteps =
-      map CorridorSpace $
-      flexibleRange (aTypeToCorridorNum aType1) (aTypeToCorridorNum aType2)
-    roomStepOut = map (Room aType1) $ flexibleRange rNum1 1
-    roomStepIn = map (Room aType2) [1 .. rNum2]
+    nearestCorridorSpace = CorridorSpace $ aTypeToCorridorNum aType1
 route (CorridorSpace _) (CorridorSpace _) =
   error "Should not be moving from one corridor space to another"
 

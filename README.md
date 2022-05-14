@@ -2076,14 +2076,10 @@ route (CorridorSpace cNum) (Room aType rNum) = corridorSteps ++ roomStep
     corridorSteps =
       map CorridorSpace $ flexibleRange cNum (aTypeToCorridorNum aType)
     roomStep = map (Room aType) [1 .. rNum]
-route (Room aType1 rNum1) (Room aType2 rNum2) =
-  roomStepOut ++ corridorSteps ++ roomStepIn
+route r1@(Room aType1 rNum1) r2@(Room aType2 rNum2) =
+  tail (route r1 nearestCorridorSpace) ++ route nearestCorridorSpace r2
   where
-    corridorSteps =
-      map CorridorSpace $
-      flexibleRange (aTypeToCorridorNum aType1) (aTypeToCorridorNum aType2)
-    roomStepOut = map (Room aType1) $ flexibleRange rNum1 1
-    roomStepIn = map (Room aType2) [1 .. rNum2]
+    nearestCorridorSpace = CorridorSpace $ aTypeToCorridorNum aType1
 route (CorridorSpace _) (CorridorSpace _) =
   error "Should not be moving from one corridor space to another"
 
@@ -2094,5 +2090,93 @@ aTypeToCorridorNum aType =
     B -> 4
     C -> 6
     D -> 8
+
 ```
-It uses `flexibleRange`, which is a utility function I wrote for day 5 to enumerate from lower to higher numbers or vice-versa.
+It uses `flexibleRange`, which is a utility function I wrote for day 5 to enumerate from lower to higher numbers or vice-versa. Going from a room to a corridor is simple: just concatenate whatever steps you need to do to get out of the room (there will only be 1 or 2) with the `flexibleRange` of the corrdor space immediately outside that room to our destination corridor space. Room to corridor and room straight to room are similar.
+
+Now we have that logic, we can define a `Move` as a product of the new state (the result of the movement) and the cost incurred.
+```haskell
+data Move
+  = MkMove
+      { _state :: BurrowState
+      , _cost  :: Integer
+      }
+  deriving (Eq, Ord, Show)
+```
+
+And we can start defining some logic to to enumerate all the possible moves for an amphipod and state. For example, given a `BurrowState`, there might be certain number of moves which get an Amphipod straight to their destination. 
+
+For an Amphipod to be able to move to its target room, all the spaces on its journey must be unoccupied: 
+
+```haskell
+moveStraightToRoom :: Amphipod -> BurrowState -> Maybe Move
+moveStraightToRoom aPod@(MkApod pos aType) bs = do
+  ds <- destinationRoomSpace aPod bs
+  let path = tail $ route pos ds
+  let pathIsClear = not $ any (`occupied` bs) path
+  newState <-
+    if pathIsClear
+      then pure $ S.insert (MkApod ds aType) $ S.filter (/= aPod) bs --Move the Apod to its destination
+      else Nothing
+  let cost = toInteger (length path) * movementCost aType
+  pure $ MkMove newState cost
+
+occupied :: BurrowSpace -> BurrowState -> Bool
+occupied bSpace bState = isJust $ getOccupant bSpace bState
+
+getOccupant :: BurrowSpace -> BurrowState -> Maybe Amphipod
+getOccupant bSpace = find (\(MkApod space aType) -> space == bSpace)
+
+movementCost aType =
+  case aType of
+    A -> 1
+    B -> 10
+    C -> 100
+    D -> 1000
+```
+
+If the path is not clear, we return a `Nothing`. If not, we filter the the Amphipod we're moving out of the old state and insert it (with its new location) into a brand new state.
+
+Enumerating all possible corridor moves turns out to be quite simple as well. As with before, all the spaces on the path must be unoccupied. On top of that, we now the Amphipod is too polite to wait directly outside a room, so those possible destinations must be filtered from the list.
+```haskell
+corridorMoves :: Amphipod -> BurrowState -> [Move]
+corridorMoves aPod@(MkApod pos@(Room rType rNum) aType) bs =
+  mapMaybe go $ filter (not . isOutsideRoom) $ map CorridorSpace [0 .. 10]
+  where
+    go cSpace =
+      let path = tail $ route pos cSpace
+          pathIsClear = not $ any (`occupied` bs) path
+          cost = toInteger (length path) * movementCost aType
+          newState = S.insert (MkApod cSpace aType) $ S.filter (/= aPod) bs
+       in if pathIsClear
+            then Just (MkMove newState cost)
+            else Nothing
+corridorMoves _ _ = []
+
+haskell
+```
+
+We can combine these functions to work out all the possible next moves from one burrow state. Keep in mind: we only want to enumerate moves for 'moveable' amphipods ie. Amphipods that have not already reached their destination room. An amphipod who is in its own room, but in the way of another one which needs to get out does _not_ count as finished.
+```haskell
+nextMoves :: BurrowState -> S.Set Move
+nextMoves bs = ($!) S.union toRoomMoves allCorridorMoves
+  where
+    moveable = S.filter (not . flip isFinished bs) bs
+    toRoomMoves = SU.mapMaybe (`moveStraightToRoom` bs) moveable
+    allCorridorMoves = S.fromList $ concatMap (`corridorMoves` bs) moveable
+
+isFinished (MkApod position amType) bs =
+  case position of
+    CorridorSpace n -> False
+    Room roomType roomDepth ->
+      roomType == amType &&
+      (let otherRoomOccupants = S.filter (inRoomType roomType) bs
+        in all ((== roomType) . _amType) otherRoomOccupants)
+      where inRoomType t (MkApod pos _) =
+              case pos of
+                CorridorSpace n -> False
+                Room at _       -> at == t
+```
+
+Ok, now it gets _really_ tricky. We finally have our means of calculating neighbouring nodes given a node (a `BurrowState`), which means we can implement Dijkstra's algorithm again. I pretty much copied what I did last time, so my first pass looked something like this:
+
