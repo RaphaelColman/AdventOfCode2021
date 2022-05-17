@@ -1,6 +1,6 @@
 module Solutions.Day15
-  ( aoc15
-  ) where
+    ( aoc15
+    ) where
 
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions, printTestSolutions)
@@ -8,7 +8,8 @@ import           Common.Debugging    (traceLns, traceVectorMap)
 import           Common.Geometry     (Grid, Point, allOrthogonalNeighbours,
                                       enumerateMultilineStringToVectorMap,
                                       gridOrthogonalNeighbours, renderVectorMap)
-import           Common.MapUtils
+import           Common.GraphUtils   (dijkstra)
+import           Common.MapUtils     (minimumValue)
 import           Data.Char           (digitToInt)
 import           Data.Foldable       (maximumBy, minimum, minimumBy)
 import           Data.Function       (on)
@@ -20,8 +21,8 @@ import           Text.Trifecta       (CharParsing (anyChar), Parser, some)
 
 aoc15 :: IO ()
 aoc15 = do
-  printTestSolutions 15 $ MkAoCSolution parseInput part1
-  printTestSolutions 15 $ MkAoCSolution parseInput part2
+  printSolutions 15 $ MkAoCSolution parseInput part1
+  printSolutions 15 $ MkAoCSolution parseInput part2
 
 parseInput :: Parser (Grid Int)
 parseInput = do
@@ -29,29 +30,17 @@ parseInput = do
   let charGrid = enumerateMultilineStringToVectorMap all
   pure $ M.map (\c -> read [c]) charGrid
 
-part1 :: Grid Int -> Int
-part1 = dijkstra
+part1 :: Grid Int -> Maybe Integer
+part1 = findBestPath
 
-part2 :: Grid Int -> Int
+part2 :: M.Map Point Int -> Maybe Integer
 part2 grid =
   let unfolded = unfoldGrid grid
-   in dijkstra unfolded
+   in findBestPath unfolded
 
-dijkstra :: Grid Int -> Int
-dijkstra grid = go (V2 0 0) (M.fromList [(V2 0 0, 0)]) $ M.keysSet grid
-  where
-    bottomRight' = bottomRight grid
-    go current tDistances unvisited
-      | current == bottomRight' = tDistances M.! current
-      | otherwise = ($!) go minNode newTDistances newUnvisited
-      where
-        children = gridOrthogonalNeighbours grid current
-        unVisitedChildren = M.restrictKeys children unvisited
-        distances = M.map (+ tDistances M.! current) unVisitedChildren
-        newTDistances = M.unionWith min distances tDistances
-        newUnvisited = S.delete current unvisited
-        (minNode, value) =
-          minimumValue $ M.restrictKeys newTDistances newUnvisited
+findBestPath :: Grid Int -> Maybe Integer
+findBestPath grid = dijkstra (V2 0 0) nbr (== bottomRight grid)
+  where nbr = M.map toInteger . gridOrthogonalNeighbours grid
 
 bottomRight :: Grid a -> V2 Int
 bottomRight grid = maximumBy compareFun $ M.keysSet grid

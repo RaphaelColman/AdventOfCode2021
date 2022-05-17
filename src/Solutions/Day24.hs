@@ -9,9 +9,9 @@ import           Control.Applicative (Alternative (empty), (<|>))
 import           Data.Char           (digitToInt, isDigit)
 import           Data.Foldable       (Foldable (foldl'), find)
 import qualified Data.Map            as M
-import           Data.Text.Format
-import           Debug.Trace
-import Data.List.Split
+import Data.Text.Format ()
+import Debug.Trace ()
+import Data.List.Split ( chunksOf )
 import           Text.Trifecta       (CharParsing (anyChar, char), Parser,
                                       Parsing (try), TokenParsing (token),
                                       alphaNum, digit, integer, letter, newline,

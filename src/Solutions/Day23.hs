@@ -1,15 +1,17 @@
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds       #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-deferred-out-of-scope-variables #-}
 
 module Solutions.Day23
-   where
+    ( aoc23
+    ) where
 
 import           Common.AoCSolutions (AoCSolution (MkAoCSolution),
                                       printSolutions, printTestSolutions)
 import           Common.Debugging    ()
 import           Common.Geometry     (Point, renderVectorMap)
+import           Common.GraphUtils   (WGraphNode (neighbours), dijkstra)
 import           Common.ListUtils    (flexibleRange, singleton, window3)
 import           Common.MapUtils     (minimumValue)
 import qualified Common.SetUtils     as SU
@@ -31,8 +33,13 @@ import           Text.Trifecta       (CharParsing (anyChar, char), Parser,
                                       manyTill, upper)
 
 data BurrowSpace
-  = CorridorSpace { _column :: Integer }
-  | Room { _roomType :: AmType, _depth :: Integer }
+  = CorridorSpace
+      { _column :: Integer
+      }
+  | Room
+      { _roomType :: AmType
+      , _depth    :: Integer
+      }
   deriving (Eq, Ord, Show)
 
 data AmType = A | B | C | D deriving (Enum, Eq, Ord, Show)
@@ -58,8 +65,8 @@ makeLenses ''Amphipod
 
 aoc23 :: IO ()
 aoc23 = do
-  printTestSolutions 23 $ MkAoCSolution parseInput part1
-  printTestSolutions 23 $ MkAoCSolution parseInput part2
+  printSolutions 23 $ MkAoCSolution parseInput part1
+  printSolutions 23 $ MkAoCSolution parseInput part2
   where
     debugLn (MkMove state cost) = do
       putStrLn $ renderVectorMap $ renderBurrowState state
@@ -82,10 +89,10 @@ parseInput = do
     rooms = zipWith Room (cycle [A, B, C, D]) [1, 1, 1, 1, 2, 2, 2, 2]
 
 part1 :: BurrowState -> Maybe Integer
-part1 = dijkstraPQ
+part1 = findBestPath
 
 part2 :: BurrowState -> Maybe Integer
-part2 = dijkstraPQ . unfoldApods
+part2 = findBestPath . unfoldApods
 
 unfoldApods :: BurrowState -> BurrowState
 unfoldApods bs = S.unions [depth1, extraApods, moveTo4 `S.map` depth2]
@@ -173,32 +180,20 @@ corridorMoves aPod@(MkApod pos@(Room rType rNum) aType) bs =
             else Nothing
 corridorMoves _ _ = []
 
-dijkstraPQ :: BurrowState -> Maybe Integer
-dijkstraPQ bs = go (PQ.singleton bs 0) mempty mempty
-  where
-    go pq costs visited = do
-      (current PQ.:-> cost, remainingQueue) <- PQ.minView pq
-      let isLowerCost =
-            traceShow cost $ maybe True (> cost) $ M.lookup current costs
-      if burrowComplete current
-        then pure cost
-        else
-          if current `S.notMember` visited && isLowerCost
-            then
-              let newVisited = S.insert current visited
-                  newCosts = M.insert current cost costs
-                  unvisitedChildren =
-                    S.filter
-                      (\(MkMove state cost) -> state `S.notMember` visited) $
-                    nextMoves current
-                  newPQ =
-                    S.fold
-                      (\(MkMove state' cost') pq' ->
-                         PQ.insertWith min state' (cost' + cost) pq')
-                      pq
-                      unvisitedChildren
-              in ($!) go newPQ newCosts newVisited
-            else ($!) go remainingQueue costs visited
+newtype WGraphNodeBS
+  = WGraphNodeBS { _bs :: BurrowState }
+  deriving (Eq, Ord)
+
+instance WGraphNode WGraphNodeBS where
+  neighbours (WGraphNodeBS bs) = moves
+    where moves = S.map (\(MkMove move cost) -> (WGraphNodeBS move, cost)) $ nextMoves bs
+
+findBestPath :: BurrowState -> Maybe Integer
+findBestPath burrowState = dijkstra burrowState nextMovesMap burrowComplete
+  where nextMovesMap = M.fromList .
+              map (\(MkMove state cost) -> (state, cost)) .
+              S.toList .
+              nextMoves
 
 --Route from start node to end node (including start and end nodes)
 route :: BurrowSpace -> BurrowSpace -> [BurrowSpace]
