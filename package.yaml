@@ -39,6 +39,8 @@ dependencies:
 - monad-loops
 - monad-extras
 - PSQueue
+- parser-combinators
+- parsers
 
 library:
   source-dirs: src

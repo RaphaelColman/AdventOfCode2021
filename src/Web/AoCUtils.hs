@@ -6,7 +6,8 @@ module Web.AoCUtils
   , ConfigError(MkGenericConfigError)
   ) where
 
-import           Advent
+import Advent
+    ( runAoC, mkDay_, AoC(AoCInput), AoCError, AoCOpts(AoCOpts) )
 import           Common.FileUtils           (getTestInputFile)
 import           Configuration.Dotenv       (defaultConfig, loadFile)
 import           Control.Monad.Trans.Class  (MonadTrans (lift))

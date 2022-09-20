@@ -40,6 +40,7 @@ library
       Common.Predicates
       Common.SetUtils
       Lib
+      ParseReadme
       Solutions.Day1
       Solutions.Day10
       Solutions.Day11
@@ -84,6 +85,8 @@ library
     , monad-extras
     , monad-loops
     , mtl
+    , parser-combinators
+    , parsers
     , safe
     , split
     , text
@@ -114,6 +117,8 @@ executable AdventOfCode2021-exe
     , monad-extras
     , monad-loops
     , mtl
+    , parser-combinators
+    , parsers
     , safe
     , split
     , text
@@ -145,6 +150,8 @@ test-suite AdventOfCode2021-test
     , monad-extras
     , monad-loops
     , mtl
+    , parser-combinators
+    , parsers
     , safe
     , split
     , text
