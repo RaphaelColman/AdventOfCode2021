@@ -1,9 +1,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module ParseReadme where
-import           Control.Applicative.Combinators (choice,
-                                                  manyTill, manyTill_, some,
-                                                  (<|>), many)
+import           Control.Applicative.Combinators (choice, many, manyTill,
+                                                  manyTill_, some, (<|>))
 import           Control.Exception               (SomeException)
 import           Data.Data                       (Data (toConstr), Typeable)
 import           Data.Foldable                   (Foldable (foldr'))
@@ -20,6 +19,7 @@ import           Text.Trifecta                   (CharParsing (anyChar, char, st
                                                   sepBy, some, spaces,
                                                   stringLiteral, try,
                                                   whiteSpace)
+import Debug.Trace
 
 newtype MdBlock
   = MkBody { body :: String }
@@ -49,7 +49,10 @@ parseMd = some parseSection
 
 parseContent :: Parser MdBlock
 parseContent = do
-  MkBody <$> manyTill anyChar (eof <|> try (lookAhead nextHeader) <* newline)
+  firstChar <- lookAhead anyChar
+  case firstChar of
+    '#' -> pure $ MkBody ""
+    _   -> MkBody <$> manyTill anyChar (eof <|> try (lookAhead nextHeader) <* newline)
   where nextHeader = do
         newline
         char '#'
@@ -67,5 +70,5 @@ parseReadme :: IO ()
 parseReadme = do
   result <- parseFromFile parseMd "README.md"
   case result of
-    Nothing -> return ()
-    Just s  -> print $ length <$> result
+    Nothing       -> return ()
+    Just sections -> print $ sections !! 5
