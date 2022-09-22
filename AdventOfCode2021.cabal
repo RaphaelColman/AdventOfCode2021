@@ -87,6 +87,7 @@ library
     , mtl
     , parser-combinators
     , parsers
+    , regex-tdfa
     , safe
     , split
     , text
@@ -119,6 +120,7 @@ executable AdventOfCode2021-exe
     , mtl
     , parser-combinators
     , parsers
+    , regex-tdfa
     , safe
     , split
     , text
@@ -152,6 +154,7 @@ test-suite AdventOfCode2021-test
     , mtl
     , parser-combinators
     , parsers
+    , regex-tdfa
     , safe
     , split
     , text

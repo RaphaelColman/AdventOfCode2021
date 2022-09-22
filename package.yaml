@@ -41,6 +41,7 @@ dependencies:
 - PSQueue
 - parser-combinators
 - parsers
+- regex-tdfa
 
 library:
   source-dirs: src

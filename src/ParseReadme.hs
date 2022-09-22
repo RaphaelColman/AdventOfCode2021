@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module ParseReadme where
 import           Control.Applicative.Combinators (choice, many, manyTill,
@@ -11,6 +12,7 @@ import           Data.List                       (groupBy)
 import qualified Data.Map                        as M
 import qualified Data.Sequence                   as S
 import           Text.Parser.LookAhead           (LookAheadParsing (lookAhead))
+import Text.Regex.TDFA
 import           Text.Trifecta                   (CharParsing (anyChar, char, string),
                                                   Parser, Parsing (eof),
                                                   TokenParsing (someSpace),
@@ -19,7 +21,6 @@ import           Text.Trifecta                   (CharParsing (anyChar, char, st
                                                   sepBy, some, spaces,
                                                   stringLiteral, try,
                                                   whiteSpace)
-import Debug.Trace
 
 newtype MdBlock
   = MkBody { body :: String }
@@ -71,4 +72,9 @@ parseReadme = do
   result <- parseFromFile parseMd "README.md"
   case result of
     Nothing       -> return ()
-    Just sections -> print $ sections !! 5
+    Just sections -> print $ length $ filterToDays sections
+
+
+filterToDays :: Chapters -> Chapters
+filterToDays = filter (\(MkSection title body) -> isDayTitle title)
+  where isDayTitle title = title =~ "Day [0-9]{1,2}" :: Bool
