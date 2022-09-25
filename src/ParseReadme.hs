@@ -55,9 +55,9 @@ parseContent = do
     '#' -> pure $ MkBody ""
     _   -> MkBody <$> manyTill anyChar (eof <|> try (lookAhead nextHeader) <* newline)
   where nextHeader = do
-        newline
-        char '#'
-        return ()
+              newline
+              char '#'
+              return ()
 
 parseHeading :: Parser MdHeading
 parseHeading = do

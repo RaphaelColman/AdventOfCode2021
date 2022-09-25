@@ -42,6 +42,10 @@ dependencies:
 - parser-combinators
 - parsers
 - regex-tdfa
+- amazonka
+- amazonka-s3
+- amazonka-dynamodb
+- unordered-containers
 
 library:
   source-dirs: src
