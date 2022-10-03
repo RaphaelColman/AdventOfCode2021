@@ -46,6 +46,7 @@ sectionToPutItem (MkSection title body) = do
               , ("title", attributeValue & avS ?~ pack title)
               , ("content", attributeValue & avS ?~ pack body)
               , ("timestamp", attributeValue & avN ?~ pack (show timestamp))
+              , ("authorId", attributeValue & avS ?~ pack "BaffledRaffles")
             ]
   pure $ putItem "BaffledRafflesBlogEntries" & piItem .~ hm
 
