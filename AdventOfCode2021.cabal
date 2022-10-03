@@ -96,9 +96,11 @@ library
     , split
     , text
     , text-format
+    , time
     , transformers
     , trifecta
     , unordered-containers
+    , uuid
   default-language: Haskell2010
 
 executable AdventOfCode2021-exe
@@ -133,9 +135,11 @@ executable AdventOfCode2021-exe
     , split
     , text
     , text-format
+    , time
     , transformers
     , trifecta
     , unordered-containers
+    , uuid
   default-language: Haskell2010
 
 test-suite AdventOfCode2021-test
@@ -171,7 +175,9 @@ test-suite AdventOfCode2021-test
     , split
     , text
     , text-format
+    , time
     , transformers
     , trifecta
     , unordered-containers
+    , uuid
   default-language: Haskell2010

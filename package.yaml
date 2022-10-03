@@ -46,6 +46,8 @@ dependencies:
 - amazonka-s3
 - amazonka-dynamodb
 - unordered-containers
+- uuid
+- time
 
 library:
   source-dirs: src

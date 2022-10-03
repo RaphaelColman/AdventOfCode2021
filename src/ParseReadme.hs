@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module ParseReadme where
+module ParseReadme(parseReadme, Section(MkSection)) where
 import           Control.Applicative.Combinators (choice, many, manyTill,
                                                   manyTill_, some, (<|>))
 import           Control.Exception               (SomeException)
@@ -21,6 +21,9 @@ import           Text.Trifecta                   (CharParsing (anyChar, char, st
                                                   sepBy, some, spaces,
                                                   stringLiteral, try,
                                                   whiteSpace)
+import Control.Monad.IO.Class (MonadIO)
+import Control.Monad.Trans.Maybe (MaybeT(MaybeT, runMaybeT))
+import Control.Monad.Cont (MonadTrans(lift))
 
 newtype MdBlock
   = MkBody { body :: String }
@@ -67,13 +70,10 @@ parseHeading = do
   pure $ MkHeading (length hashes) title
 
 
-parseReadme :: IO ()
-parseReadme = do
-  result <- parseFromFile parseMd "README.md"
-  case result of
-    Nothing       -> return ()
-    Just sections -> print $ length $ filterToDays sections
-
+parseReadme :: MaybeT IO Chapters
+parseReadme = MaybeT $ do
+  chapters <- parseFromFile parseMd "README.md"
+  pure $ filterToDays <$> chapters
 
 filterToDays :: Chapters -> Chapters
 filterToDays = filter (\(MkSection title body) -> isDayTitle title)
