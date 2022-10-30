@@ -204,7 +204,7 @@ part1 bd = gamma * epsilon
     gamma = toDecimal $ map mostCommon $ transpose bd
     epsilon = toDecimal $ map leastCommon $ transpose bd
 ```
-`toDecimal` is just a function which zips through a `BinaryDigit` and multiplies it by the corresponding power of 2 (so we can geta decimal at the end)
+`toDecimal` is just a function which zips through a `BinaryDigit` and multiplies it by the corresponding power of 2 (so we can get a decimal at the end)
 The `mostCommon` and `leastCommon` functions are just helpers for list which do what they say on the tin. Did you see how `BinaryDigit` derives `Ord`? That means
 Haskell will use the order you've declared the data constructors to implement the `Ord` typeclass. We get the added bonus that it will take `ONE` as the tie-breaker in `mostCommon` and `ZERO` as the tie-breaker in `leastCommon`. That's lucky, because it's required for the puzzle!
 ```haskell

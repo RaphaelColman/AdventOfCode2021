@@ -7,42 +7,42 @@ packages:
 - completed:
     hackage: advent-of-code-api-0.2.8.0@sha256:37f277d71f846f78f393eef786e1834648d7de951a8061aefa8b06e1aa5e0aa7,2351
     pantry-tree:
-      size: 1185
       sha256: 9f2e833e9127ca801d94b520bf63189a828ea2ae571fe8bb2922909efa98fabb
+      size: 1185
   original:
     hackage: advent-of-code-api-0.2.8.0
 - completed:
     hackage: parsec3-numbers-0.1.0@sha256:2f32295f9f4023f7f97da851549aaaf5e72866e98bf016a1ac3c6e8715bbaf8a,685
     pantry-tree:
-      size: 264
       sha256: a3d23f56cc2a9d17ed24ac5119a7b2102d40c0afeed5271f6b41b7597f181df0
+      size: 264
   original:
     hackage: parsec3-numbers-0.1.0
 - completed:
     hackage: PSQueue-1.1.0.1@sha256:498cd3d55e4644afbeaeb4d1df63392cd95826991465099395abb7d0c3ce3e58,1318
     pantry-tree:
-      size: 214
       sha256: 20f22262b113ba31601dcdd2c29315f70365ab298f1ddb3a6fb2c6d8cfb07b2a
+      size: 214
   original:
     hackage: PSQueue-1.1.0.1@sha256:498cd3d55e4644afbeaeb4d1df63392cd95826991465099395abb7d0c3ce3e58,1318
 - completed:
     hackage: amazonka-1.6.1@sha256:f58b63e83876f93aa03c54e54b3eb8ba9358af93819d41f4a5a8f8b7d8b8399c,3544
     pantry-tree:
-      size: 992
       sha256: d792656a70ee42df262a599bc6608bda069e33092d665c3438a6eeeaf7db4fb2
+      size: 992
   original:
     hackage: amazonka-1.6.1@sha256:f58b63e83876f93aa03c54e54b3eb8ba9358af93819d41f4a5a8f8b7d8b8399c,3544
 - completed:
     hackage: unliftio-core-0.1.2.0@sha256:b0a7652ffce2284a6cebe05c99eb60573a8fb6631163f34b0b30a80b4a78cb23,1081
     pantry-tree:
-      size: 328
       sha256: 9d970bf5f98e68e8fc129b04d6c9d8eb1e641c7556ffd0f0a168a259335b6fd7
+      size: 328
   original:
     hackage: unliftio-core-0.1.2.0@sha256:b0a7652ffce2284a6cebe05c99eb60573a8fb6631163f34b0b30a80b4a78cb23,1081
 snapshots:
 - completed:
+    sha256: 63539429076b7ebbab6daa7656cfb079393bf644971156dc349d7c0453694ac2
     size: 586296
     url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/18/18.yaml
-    sha256: 63539429076b7ebbab6daa7656cfb079393bf644971156dc349d7c0453694ac2
   original:
     url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/18/18.yaml
