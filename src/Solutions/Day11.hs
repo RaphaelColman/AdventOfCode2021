@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 module Solutions.Day11
   ( aoc11
   ) where
@@ -27,9 +28,9 @@ type FreqMap = M.Map Point Integer
 
 data FlashTracker =
   MkFT
-    { _alreadFlashed :: S.Set Point
-    , _flashes       :: S.Set Point
-    , _octopodes     :: Octopodes
+    { _alreadyFlashed :: !(S.Set Point)
+    , _flashes       :: !(S.Set Point)
+    , _octopodes     :: !Octopodes
     }
   deriving (Eq, Show)
 
@@ -58,14 +59,14 @@ runFlash :: Octopodes -> Octopodes
 runFlash octopodes = go $ MkFT S.empty (flashing octopodes) octopodes
   where
     go :: FlashTracker -> Octopodes
-    go ft@(MkFT alreadyFlashed flashes octopodes')
-      | null flashes = grown
+    go MkFT{..}
+      | null _flashes = grown
       | otherwise = go (MkFT newAlreadyFlashed newFlashes grown)
       where
         freqMap =
-          freqs . concatMap (M.keys . gridNeighbours octopodes') $ flashes
-        grown = M.unionWith (+) freqMap octopodes'
-        newAlreadyFlashed = S.union alreadyFlashed flashes
+          freqs . concatMap (M.keys . gridNeighbours _octopodes) $ _flashes
+        grown = M.unionWith (+) freqMap _octopodes
+        newAlreadyFlashed = S.union _alreadyFlashed _flashes
         newFlashes = S.difference (flashing grown) newAlreadyFlashed
 
 convertForRender :: Octopodes -> M.Map Point Char
